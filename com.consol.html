@@ -5,30 +5,39 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Starship COMMS SDR – 0…10 THz</title>
 <style>
-  :root{--bg:#12151b;--fg:#d7e1ff;--muted:#8b95b7}
+  :root{--bg:#12151b;--fg:#d7e1ff;--muted:#8b95b7;--line:#273043}
   *{box-sizing:border-box;font-family:ui-monospace,Consolas,monospace}
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;overflow:hidden}
 
-  /* WIP Banner */
-  .wip-banner{position:relative;width:100%;height:40px;overflow:hidden;background:rgba(0,0,0,.6);z-index:2000}
-  .wip-banner::before{content:"";position:absolute;top:0;left:0;width:200%;height:100%;
-    background:repeating-linear-gradient(45deg,transparent 0 20px,yellow 20px 40px);
-    animation:slide 12s linear infinite;opacity:.9}
-  .wip-banner__text{position:absolute;top:0;left:0;width:200%;line-height:40px;text-align:center;white-space:nowrap;
-    color:#fff;font-weight:900;letter-spacing:.12em;text-shadow:0 0 2px #000,0 0 4px #000,0 0 6px rgba(0,0,0,.6);
-    animation:slide 12s linear infinite}
-  @keyframes slide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+  /* WIP Banner (mit schwarz-gelben Streifen) */
+  .wip-banner{position:relative;height:40px;overflow:hidden;background:#000;z-index:2000;contain:content}
+  .wip-banner::before{
+    content:"";position:absolute;inset:0;pointer-events:none;opacity:.95;
+    background:repeating-linear-gradient(45deg,#000 0 20px,#ffd400 20px 40px);
+    animation:wipStripes 1.6s linear infinite;will-change:background-position
+  }
+  .wip-banner__text{
+    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;
+    white-space:nowrap;line-height:40px;color:#fff;font-weight:900;letter-spacing:.12em;
+    text-shadow:0 0 2px #000,0 0 4px #000,0 0 6px rgba(0,0,0,.6);
+    animation:wipText 12s linear infinite
+  }
+  .wip-btn{
+    appearance:none;border:1px solid #333;border-radius:6px;padding:4px 8px;background:#141414;color:#fff;cursor:pointer
+  }
+  @keyframes wipStripes{from{background-position:0 0}to{background-position:40px 0}}
+  @keyframes wipText{from{transform:translateX(0)}to{transform:translateX(-50%)}}
 
-  header{padding:10px 12px;border-bottom:1px solid #273043;display:flex;gap:12px;align-items:center}
+  header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
   .wrap{flex:1;min-height:0;display:grid;grid-template-columns:1fr 320px;gap:12px;padding:12px;overflow:hidden}
   .maincol{display:flex;flex-direction:column;gap:8px;min-height:0}
-  canvas{background:#0a0c11;border:1px solid #273043;border-radius:6px;display:block;touch-action:none}
-  aside.panel{border:1px solid #273043;border-radius:6px;padding:10px;background:#0f1218;display:grid;gap:10px;min-height:0;max-height:100%;overflow:auto}
-  input,select,button{background:#0b0e14;border:1px solid #273043;border-radius:4px;color:var(--fg);padding:6px}
+  canvas{background:#0a0c11;border:1px solid var(--line);border-radius:6px;display:block;touch-action:none;image-rendering:pixelated}
+  aside.panel{border:1px solid var(--line);border-radius:6px;padding:10px;background:#0f1218;display:grid;gap:10px;min-height:0;max-height:100%;overflow:auto}
+  input,select,button{background:#0b0e14;border:1px solid var(--line);border-radius:4px;color:var(--fg);padding:6px}
   .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
   .small{font-size:12px;color:var(--muted)}
-  footer{padding:6px 12px;border-top:1px solid #273043;color:var(--muted);display:flex;justify-content:space-between}
+  footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);display:flex;justify-content:space-between}
   @media (max-width: 900px){
     .wrap{grid-template-columns:1fr;grid-auto-rows:minmax(0,auto)}
     aside.panel{order:2}
@@ -37,9 +46,13 @@
 </style>
 </head>
 <body>
-  <!-- WIP Banner -->
+  <!-- WIP Banner mit Klick-Aufforderung -->
   <div class="wip-banner">
-    <span class="wip-banner__text">⚠️ WORK IN PROGRESS – STARSHIP COMMS SDR PROTOTYP 0…10 THz ⚠️</span>
+    <span class="wip-banner__text">
+      ⚠️ WORK IN PROGRESS – STARSHIP COMMS SDR PROTOTYP 0…10 THz ⚠️
+      <button id="audioStart" class="wip-btn" aria-label="Audio starten">Audio starten</button>
+      <button id="audioToggle" class="wip-btn" aria-label="Audio pausieren" style="display:none">Audio pausieren</button>
+    </span>
   </div>
 
   <header>
@@ -62,7 +75,7 @@
 
       <div class="row small">
         <span>Span</span>
-        <input id="span" type="range" min="1e3" max="1e13" step="1e6" value="1e13" style="width:170px">
+        <input id="span" type="range" min="1000" max="10000000000000" step="1000000" value="10000000000000" style="width:170px">
         <span id="spanLbl"></span>
       </div>
 
@@ -111,13 +124,14 @@ const fmtHz=f=>{
   if(a>=1e3)  return (f/1e3).toFixed(1)+" kHz";
   return f.toFixed(0)+" Hz";
 };
-const byUnit=(v,u)=>({Hz:1,kHz:1e3,MHz:1e6,GHz:1e9,THz:1e12}[u]||1)*v;
+const UNIT={Hz:1,kHz:1e3,MHz:1e6,GHz:1e9,THz:1e12};
+const byUnit=(v,u)=>(UNIT[u]||1)*v;
 
 /* ---------- DOM ---------- */
 const spec = document.getElementById('spectrum');
 const wf = document.getElementById('waterfall');
-const sctx = spec.getContext('2d');
-const wctx = wf.getContext('2d');
+const sctx = spec.getContext('2d',{alpha:false});
+const wctx = wf.getContext('2d',{alpha:false});
 const maincol = document.getElementById('maincol');
 
 const fCenter = document.getElementById('fCenter');
@@ -137,23 +151,27 @@ const panRBtn = document.getElementById('panR');
 const freezeBtn = document.getElementById('freeze');
 const resetBtn = document.getElementById('reset');
 
+const audioStartBtn = document.getElementById('audioStart');
+const audioToggleBtn = document.getElementById('audioToggle');
+
 /* ---------- State ---------- */
 let isFrozen=false;
 let spanVirtual = THZ_MAX;
+let statusTimer=0;
 
 /* ---------- Signals ---------- */
 const signals = [
   {name:'H-Linie', f:1.420405751e9, bw:12000},
-  {name:'H2O', f:22.235e9, bw:60000},
-  {name:'CW', f:7.023e6, bw:400},
-  {name:'THz Tel', f:2.3e12, bw:5e6}
+  {name:'H2O',     f:22.235e9,      bw:60000},
+  {name:'CW',      f:7.023e6,       bw:400},
+  {name:'THz Tel', f:2.3e12,        bw:5e6}
 ];
 for(let i=0;i<80;i++){
   signals.push({name:'NB'+i, f:Math.random()*THZ_MAX, bw:(300+Math.random()*15000)});
 }
 
 /* ---------- Freq helpers ---------- */
-function setCenterHz(f){ fCenter.value = (f / byUnit(1,unitSel.value)).toFixed(3); }
+function setCenterHz(f){ const u=unitSel.value; fCenter.value=(f/byUnit(1,u)).toFixed(3); }
 function getCenterHz(){ return byUnit(parseFloat(fCenter.value||0), unitSel.value); }
 function getSpan(){ return spanVirtual; }
 function setSpan(v){ spanVirtual = clamp(v, 1e3, THZ_MAX); span.value = Math.min(spanVirtual, 1e13); spanLbl.textContent = fmtHz(spanVirtual); }
@@ -173,39 +191,118 @@ bwLbl.textContent = (bw.value/1e3).toFixed(2)+" kHz";
 
 /* ---------- Responsive canvases ---------- */
 function resizeCanvas(c, cssW, cssH){
-  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  const dpr = Math.max(1, Math.floor((window.devicePixelRatio||1)));
   c.style.width = cssW + 'px';
   c.style.height = cssH + 'px';
-  c.width  = Math.max(1, Math.floor(cssW * dpr));
-  c.height = Math.max(1, Math.floor(cssH * dpr));
+  const w = Math.max(1, (cssW|0) * dpr);
+  const h = Math.max(1, (cssH|0) * dpr);
+  if (c.width!==w) c.width=w;
+  if (c.height!==h) c.height=h;
 }
 function layout(){
   const r = maincol.getBoundingClientRect();
-  const W = Math.max(1, Math.floor(r.width));
-  const H = Math.max(1, Math.floor(r.height));
-  const specH = Math.max(120, Math.round(H * 0.28));
+  const W = Math.max(1, r.width|0);
+  const H = Math.max(1, r.height|0);
+  const specH = Math.max(120, (H * 0.28)|0);
   const wfH   = Math.max(160, H - specH - 8);
   resizeCanvas(spec, W, specH);
   resizeCanvas(wf,   W, wfH);
 }
-window.addEventListener('resize', layout);
-window.addEventListener('orientationchange', layout);
+window.addEventListener('resize', layout, {passive:true});
+window.addEventListener('orientationchange', layout, {passive:true});
 new ResizeObserver(layout).observe(maincol);
 layout();
 
-/* ---------- Audio Feedback ---------- */
-let audioCtx=null, mainOsc=null, mainGain=null;
+/* ---------- Audio: Klick zum Start, kosmisches Hintergrundrauschen ---------- */
+let audioCtx=null, mainOsc=null, mainGain=null, noiseSrc=null, noiseGain=null, noiseFilter=null;
 function initAudio(){
   if(audioCtx) return;
-  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  const Ctx = window.AudioContext||window.webkitAudioContext;
+  if(!Ctx) return;
+  audioCtx = new Ctx();
+
+  // Haupt-Oszillator für „Tuning“-Piep
   mainOsc = audioCtx.createOscillator();
   mainGain = audioCtx.createGain();
-  mainGain.gain.value = 0;
+  mainGain.gain.value = 0; // stumm, nur bei Nähe zu Signalen anheben
+  mainOsc.type='sine'; mainOsc.frequency.value=600;
   mainOsc.connect(mainGain).connect(audioCtx.destination);
-  mainOsc.type='sine'; mainOsc.frequency.value=600; mainOsc.start();
+  mainOsc.start();
+
+  // Kosmisches Hintergrundrauschen: breites Rauschen, leicht gefiltert
+  const len = audioCtx.sampleRate * 2; // 2s Puffer
+  const noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+  const ch = noiseBuf.getChannelData(0);
+  for(let i=0;i<len;i++){
+    // weißes Rauschen
+    ch[i] = (Math.random()*2-1) * 0.25;
+  }
+  // Quelle
+  noiseSrc = audioCtx.createBufferSource();
+  noiseSrc.buffer = noiseBuf;
+  noiseSrc.loop = true;
+
+  // Sanfter Bandpass ~300..3500 Hz (hörbarer „Weltraum“-Hiss, nicht schrill)
+  noiseFilter = audioCtx.createBiquadFilter();
+  noiseFilter.type = 'bandpass';
+  noiseFilter.frequency.value = 1200;
+  noiseFilter.Q.value = 0.6;
+
+  // Lautstärke des Rauschens
+  noiseGain = audioCtx.createGain();
+  noiseGain.gain.value = 0.06; // sehr dezent
+
+  noiseSrc.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
 }
+
+function startNoise(){
+  if(!audioCtx) return;
+  try{ noiseSrc && noiseSrc.start(0); }catch(e){/* bereits gestartet */}
+}
+function stopNoise(){
+  if(!audioCtx) return;
+  try{ noiseSrc && noiseSrc.stop(0); }catch(e){/* bereits gestoppt */}
+}
+
+/* UI-Buttons für Audio */
+let audioRunning=false;
+audioStartBtn.addEventListener('click', ()=>{
+  if(!audioCtx) { initAudio(); }
+  startNoise();
+  audioRunning=true;
+  audioStartBtn.style.display='none';
+  audioToggleBtn.style.display='';
+  audioToggleBtn.textContent='Audio pausieren';
+  status('Audio gestartet');
+},{passive:true});
+
+audioToggleBtn.addEventListener('click', ()=>{
+  if(!audioCtx) return;
+  if(audioRunning){
+    stopNoise();
+    audioRunning=false;
+    audioToggleBtn.textContent='Audio fortsetzen';
+    status('Audio pausiert');
+  }else{
+    // neues BufferSource-Objekt erzeugen, wenn gestoppt
+    const len = audioCtx.sampleRate * 2;
+    const nb = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    const ch = nb.getChannelData(0);
+    for(let i=0;i<len;i++){ ch[i] = (Math.random()*2-1)*0.25; }
+    noiseSrc = audioCtx.createBufferSource();
+    noiseSrc.buffer = nb;
+    noiseSrc.loop = true;
+    noiseSrc.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
+    startNoise();
+    audioRunning=true;
+    audioToggleBtn.textContent='Audio pausieren';
+    status('Audio fortgesetzt');
+  }
+},{passive:true});
+
+/* Tuning-Ton abhängig von Cursor-Frequenz */
 function playToneForFreq(hz){
-  initAudio();
+  if(!audioCtx) return;
   const base = Math.log10(Math.max(1,hz));
   const aud = 220 * Math.pow(10, (base - 3) * 0.25);
   const nearest = signals.reduce((a,s)=> Math.abs(s.f-hz)<Math.abs(a.f-hz)?s:a, signals[0]);
@@ -236,13 +333,14 @@ resetBtn.onclick = ()=>{ setFullBand(); status('Reset 0…10 THz'); };
 
 span.oninput = ()=>{ setSpan(parseFloat(span.value)); };
 bw.oninput = ()=>{ const v=parseFloat(bw.value); bwLbl.textContent = v>=1e6? (v/1e6).toFixed(2)+" MHz": (v/1e3).toFixed(2)+" kHz"; };
+unitSel.onchange = ()=>{ setCenterHz(getCenterHz()); };
 
 /* ---------- Interaktion Wasserfall ---------- */
 let isDown=false, startX=0, startFc=0, lastHz=null;
 wf.addEventListener('pointerdown', e=>{
-  wf.setPointerCapture(e.pointerId);
-  isDown=true; startX=e.clientX; startFc=getCenterHz(); lastHz=null; initAudio(); e.preventDefault();
-});
+  wf.setPointerCapture && wf.setPointerCapture(e.pointerId);
+  isDown=true; startX=e.clientX; startFc=getCenterHz(); lastHz=null; e.preventDefault();
+},{passive:false});
 wf.addEventListener('pointermove', e=>{
   const rect = wf.getBoundingClientRect();
   const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
@@ -257,19 +355,19 @@ wf.addEventListener('pointermove', e=>{
   }else{
     rxInfo.textContent = 'View: '+fmtHz(getCenterHz()-getSpan()/2)+' … '+fmtHz(getCenterHz()+getSpan()/2);
   }
-});
+},{passive:true});
 wf.addEventListener('pointerup', e=>{
   wf.releasePointerCapture && wf.releasePointerCapture(e.pointerId);
   isDown=false;
   if(lastHz!=null){ setCenterHz(clampView(lastHz, getSpan())); lastHz=null; }
-});
+},{passive:true});
 wf.addEventListener('dblclick', e=>{
   const rect = wf.getBoundingClientRect();
   const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
   const hz = xToHz(x);
   setCenterHz(clampView(hz, getSpan()));
   status('Center: '+fmtHz(getCenterHz()));
-});
+},{passive:true});
 wf.addEventListener('wheel', e=>{
   e.preventDefault();
   const rect = wf.getBoundingClientRect();
@@ -280,9 +378,11 @@ wf.addEventListener('wheel', e=>{
 },{passive:false});
 
 /* ---------- Render ---------- */
-function drawSpectrum(now){
+/* schnelleres Waterfall: Canvas-Scroll via drawImage */
+function drawSpectrum(){
   const W=spec.width,H=spec.height;
   sctx.fillStyle='#0f1218'; sctx.fillRect(0,0,W,H);
+  sctx.beginPath();
   for(let x=0;x<W;x++){
     const hz = xToHz(x/W);
     let v = 0.06 + 0.02*(Math.random()-0.5);
@@ -291,24 +391,34 @@ function drawSpectrum(now){
       if(d < s.bw/2) v += 0.6*(1 - d/(s.bw/2));
     }
     v = clamp(v,0,1);
-    const y = H - Math.floor(v*H);
-    const r = Math.floor(30 + 220*v), g=Math.floor(50+120*v), b=Math.floor(100+150*v);
-    sctx.strokeStyle=`rgb(${r},${g},${b})`;
-    sctx.beginPath(); sctx.moveTo(x,H); sctx.lineTo(x,y); sctx.stroke();
+    const y = H - (v*H|0);
+    sctx.moveTo(x,H); sctx.lineTo(x,y);
   }
-  const full = Math.abs(getSpan()-THZ_MAX) < 1;
+  sctx.strokeStyle='#87a3ff'; sctx.stroke();
+
   sctx.fillStyle='#b8c1e1'; sctx.font='12px ui-monospace';
+  const full = Math.abs(getSpan()-THZ_MAX) < 1;
   for(let i=0;i<=10;i++){
     const f = full ? (THZ_MAX*(i/10)) : xToHz(i/10);
-    sctx.fillText(fmtHz(f), i*(W/10)+4, 14);
+    sctx.fillText(fmtHz(f), (i*(W/10)|0)+4, 14);
   }
 }
-function drawWaterfall(now){
+
+const lineCache = {w:0, data:null};
+function ensureLine(w){
+  if(lineCache.w!==w){
+    lineCache.w=w;
+    lineCache.data = new ImageData(new Uint8ClampedArray(w*4), w, 1);
+  }
+  return lineCache.data;
+}
+function drawWaterfall(){
   if(isFrozen) return;
   const W=wf.width,H=wf.height;
-  const img = wctx.getImageData(0,0,W,H-1);
-  wctx.putImageData(img,0,1);
-  const line = wctx.createImageData(W,1);
+  if(H>1) wctx.drawImage(wf, 0,0,W,H-1, 0,1,W,H-1);
+
+  const line = ensureLine(W);
+  const data = line.data;
   for(let x=0;x<W;x++){
     const hz = xToHz(x/W);
     let v = 0.06 + 0.02*(Math.random()-0.5);
@@ -317,17 +427,18 @@ function drawWaterfall(now){
       if(d < s.bw/2) v += 0.6*(1 - d/(s.bw/2));
     }
     v = clamp(v,0,1);
-    const r = Math.floor(40 + 200*Math.pow(v,1.1));
-    const g = Math.floor(20 + 200*Math.pow(v,0.9));
-    const b = Math.floor(80 + 220*v);
-    const idx = x*4;
-    line.data[idx]=r; line.data[idx+1]=g; line.data[idx+2]=b; line.data[idx+3]=255;
+    const r = (40 + 200*Math.pow(v,1.1))|0;
+    const g = (20 + 200*Math.pow(v,0.9))|0;
+    const b = (80 + 220*v)|0;
+    const idx = x<<2;
+    data[idx]=r; data[idx+1]=g; data[idx+2]=b; data[idx+3]=255;
   }
   wctx.putImageData(line,0,0);
 }
-function loop(now){
-  drawSpectrum(now);
-  drawWaterfall(now);
+
+function loop(){
+  drawSpectrum();
+  drawWaterfall();
   const fMin = getCenterHz()-getSpan()/2, fMax=getCenterHz()+getSpan()/2;
   rxInfo.textContent = 'View: '+fmtHz(fMin)+' … '+fmtHz(fMax)+' | Center '+fmtHz(getCenterHz())+' | Span '+fmtHz(getSpan());
   requestAnimationFrame(loop);
@@ -335,7 +446,11 @@ function loop(now){
 requestAnimationFrame(loop);
 
 /* ---------- Status ---------- */
-function status(msg){ statusEl.textContent=msg; setTimeout(()=>statusEl.textContent='bereit',2000); }
+function status(msg){
+  statusEl.textContent=msg;
+  clearTimeout(statusTimer);
+  statusTimer = setTimeout(()=>statusEl.textContent='bereit',2000);
+}
 </script>
 </body>
 </html>
