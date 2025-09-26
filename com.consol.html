@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Starship COMMS SDR – 0…10 THz</title>
+<style>
+  :root{--bg:#12151b;--fg:#d7e1ff;--muted:#8b95b7}
+  *{box-sizing:border-box;font-family:ui-monospace,Consolas,monospace}
+  html,body{height:100%}
+  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column}
+
+  /* WIP Banner */
+  .wip-banner{position:relative;width:100%;height:40px;overflow:hidden;background:rgba(0,0,0,.6);z-index:2000}
+  .wip-banner::before{content:"";position:absolute;top:0;left:0;width:200%;height:100%;
+    background:repeating-linear-gradient(45deg,transparent 0 20px,yellow 20px 40px);
+    animation:slide 12s linear infinite;opacity:.9}
+  .wip-banner__text{position:absolute;top:0;left:0;width:200%;line-height:40px;text-align:center;white-space:nowrap;
+    color:#fff;font-weight:900;letter-spacing:.12em;text-shadow:0 0 2px #000,0 0 4px #000,0 0 6px rgba(0,0,0,.6);
+    animation:slide 12s linear infinite}
+  @keyframes slide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+  header{padding:10px 12px;border-bottom:1px solid #273043;display:flex;gap:12px;align-items:center}
+  .wrap{flex:1;min-height:0;display:grid;grid-template-columns:1fr 320px;gap:12px;padding:12px;overflow:hidden}
+  .maincol{display:flex;flex-direction:column;gap:8px;min-height:0}
+  canvas{background:#0a0c11;border:1px solid #273043;border-radius:6px;display:block;touch-action:none}
+  aside.panel{border:1px solid #273043;border-radius:6px;padding:10px;background:#0f1218;display:grid;gap:10px;min-height:0;max-height:100%;overflow:auto}
+  input,select,button{background:#0b0e14;border:1px solid #273043;border-radius:4px;color:var(--fg);padding:6px}
+  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+  .small{font-size:12px;color:var(--muted)}
+  footer{padding:6px 12px;border-top:1px solid #273043;color:var(--muted);display:flex;justify-content:space-between}
+  @media (max-width: 900px){
+    .wrap{grid-template-columns:1fr;grid-auto-rows:minmax(0,auto)}
+    aside.panel{order:2}
+    .maincol{order:1}
+  }
+</style>
+</head>
+<body>
+  <!-- WIP Banner -->
+  <div class="wip-banner">
+    <span class="wip-banner__text">⚠️ WORK IN PROGRESS – STARSHIP COMMS SDR PROTOTYP 0…10 THz ⚠️</span>
+  </div>
+
+  <header>
+    <h1>STARSHIP COMMS SDR</h1>
+    <small class="small">Vollbild • Pan • Zoom • 0…10 THz</small>
+  </header>
+
+  <div class="wrap">
+    <div class="maincol" id="maincol">
+      <canvas id="spectrum"></canvas>
+      <canvas id="waterfall"></canvas>
+    </div>
+
+    <aside class="panel" aria-label="Bedienfeld">
+      <div class="row small">
+        <span>Mittenfreq</span>
+        <input id="fCenter" type="number" step="1" min="0" max="10000000000000">
+        <select id="unit"><option>Hz</option><option>kHz</option><option selected>MHz</option><option>GHz</option><option>THz</option></select>
+      </div>
+
+      <div class="row small">
+        <span>Span</span>
+        <input id="span" type="range" min="1e3" max="1e13" step="1e6" value="1e13" style="width:170px">
+        <span id="spanLbl"></span>
+      </div>
+
+      <div class="row small">
+        <button id="zoomIn">Zoom +</button>
+        <button id="zoomOut">Zoom −</button>
+        <button id="zoomFull">Max-Zoom-Out</button>
+      </div>
+
+      <div class="row small">
+        <button id="panL">◀ Pan</button>
+        <button id="panR">Pan ▶</button>
+      </div>
+
+      <div class="row small">
+        <span>Filter</span>
+        <input id="bw" type="range" min="300" max="500000" step="100" value="2400" style="width:170px">
+        <span id="bwLbl">2.40 kHz</span>
+      </div>
+
+      <div class="row small">
+        <span>Demod</span>
+        <select id="mode"><option>CW</option><option selected>USB</option><option>LSB</option><option>AM</option><option>FM</option><option>IQ</option></select>
+        <button id="freeze">Freeze</button>
+        <button id="reset">Reset</button>
+      </div>
+
+      <div class="small" id="rxInfo"></div>
+      <div class="small" id="status">bereit</div>
+    </aside>
+  </div>
+
+  <footer>
+    <div class="small">Wheel=Zoom | Drag=Pan | DblClick=Center | Full-Band=0…10 THz</div>
+  </footer>
+
+<script>
+/* ---------- Utils ---------- */
+const THZ_MAX = 10e12;
+const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
+const fmtHz=f=>{
+  const a=Math.abs(f);
+  if(a>=1e12) return (f/1e12).toFixed(3)+" THz";
+  if(a>=1e9)  return (f/1e9).toFixed(6)+" GHz";
+  if(a>=1e6)  return (f/1e6).toFixed(3)+" MHz";
+  if(a>=1e3)  return (f/1e3).toFixed(1)+" kHz";
+  return f.toFixed(0)+" Hz";
+};
+const byUnit=(v,u)=>({Hz:1,kHz:1e3,MHz:1e6,GHz:1e9,THz:1e12}[u]||1)*v;
+
+/* ---------- DOM ---------- */
+const spec = document.getElementById('spectrum');
+const wf = document.getElementById('waterfall');
+const sctx = spec.getContext('2d');
+const wctx = wf.getContext('2d');
+const maincol = document.getElementById('maincol');
+
+const fCenter = document.getElementById('fCenter');
+const unitSel = document.getElementById('unit');
+const span = document.getElementById('span');
+const spanLbl = document.getElementById('spanLbl');
+const bw = document.getElementById('bw');
+const bwLbl = document.getElementById('bwLbl');
+const rxInfo = document.getElementById('rxInfo');
+const statusEl = document.getElementById('status');
+
+const zoomInBtn = document.getElementById('zoomIn');
+const zoomOutBtn = document.getElementById('zoomOut');
+const zoomFullBtn = document.getElementById('zoomFull');
+const panLBtn = document.getElementById('panL');
+const panRBtn = document.getElementById('panR');
+const freezeBtn = document.getElementById('freeze');
+const resetBtn = document.getElementById('reset');
+
+/* ---------- State ---------- */
+let isFrozen=false;
+let spanVirtual = THZ_MAX;
+
+/* ---------- Signals ---------- */
+const signals = [
+  {name:'H-Linie', f:1.420405751e9, bw:12000},
+  {name:'H2O', f:22.235e9, bw:60000},
+  {name:'CW', f:7.023e6, bw:400},
+  {name:'THz Tel', f:2.3e12, bw:5e6}
+];
+for(let i=0;i<80;i++){
+  signals.push({name:'NB'+i, f:Math.random()*THZ_MAX, bw:(300+Math.random()*15000)});
+}
+
+/* ---------- Freq helpers ---------- */
+function setCenterHz(f){ fCenter.value = (f / byUnit(1,unitSel.value)).toFixed(3); }
+function getCenterHz(){ return byUnit(parseFloat(fCenter.value||0), unitSel.value); }
+function getSpan(){ return spanVirtual; }
+function setSpan(v){ spanVirtual = clamp(v, 1e3, THZ_MAX); span.value = Math.min(spanVirtual, 1e13); spanLbl.textContent = fmtHz(spanVirtual); }
+function xToHz(x){ const fc=getCenterHz(), sp=getSpan(); return fc + (x-0.5)*sp; }
+function hzToX(hz){ const fc=getCenterHz(), sp=getSpan(); return ((hz - fc)/sp) + 0.5; }
+function clampView(fc, sp){
+  let fMin = fc - sp/2, fMax = fc + sp/2;
+  if(fMin < 0){ fc += -fMin; }
+  if(fMax > THZ_MAX){ fc -= (fMax-THZ_MAX); }
+  return fc;
+}
+
+/* ---------- Full-Band ---------- */
+function setFullBand(){ setSpan(THZ_MAX); setCenterHz(THZ_MAX/2); }
+setFullBand();
+bwLbl.textContent = (bw.value/1e3).toFixed(2)+" kHz";
+
+/* ---------- Responsive canvases ---------- */
+function resizeCanvas(c, cssW, cssH){
+  const dpr = Math.max(1, window.devicePixelRatio || 1);
+  c.style.width = cssW + 'px';
+  c.style.height = cssH + 'px';
+  c.width  = Math.max(1, Math.floor(cssW * dpr));
+  c.height = Math.max(1, Math.floor(cssH * dpr));
+}
+function layout(){
+  const r = maincol.getBoundingClientRect();
+  const W = Math.max(1, Math.floor(r.width));
+  const H = Math.max(1, Math.floor(r.height));
+  const specH = Math.max(120, Math.round(H * 0.28));
+  const wfH   = Math.max(160, H - specH - 8);
+  resizeCanvas(spec, W, specH);
+  resizeCanvas(wf,   W, wfH);
+}
+window.addEventListener('resize', layout);
+window.addEventListener('orientationchange', layout);
+new ResizeObserver(layout).observe(maincol);
+layout();
+
+/* ---------- Audio Feedback ---------- */
+let audioCtx=null, mainOsc=null, mainGain=null;
+function initAudio(){
+  if(audioCtx) return;
+  audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+  mainOsc = audioCtx.createOscillator();
+  mainGain = audioCtx.createGain();
+  mainGain.gain.value = 0;
+  mainOsc.connect(mainGain).connect(audioCtx.destination);
+  mainOsc.type='sine'; mainOsc.frequency.value=600; mainOsc.start();
+}
+function playToneForFreq(hz){
+  initAudio();
+  const base = Math.log10(Math.max(1,hz));
+  const aud = 220 * Math.pow(10, (base - 3) * 0.25);
+  const nearest = signals.reduce((a,s)=> Math.abs(s.f-hz)<Math.abs(a.f-hz)?s:a, signals[0]);
+  const prox = Math.max(0, 1 - Math.abs(nearest.f - hz) / Math.max(1, nearest.bw*2));
+  mainOsc.frequency.setTargetAtTime(clamp(aud,80,6000), audioCtx.currentTime, 0.02);
+  mainGain.gain.setTargetAtTime(0.02 + 0.18 * prox, audioCtx.currentTime, 0.02);
+}
+
+/* ---------- Controls ---------- */
+function applyZoom(factor, anchorHz=null){
+  const sp = getSpan();
+  const newSp = clamp(sp / factor, 1e3, THZ_MAX);
+  const x = anchorHz ? hzToX(anchorHz) : 0.5;
+  setSpan(newSp);
+  const fcNew = clampView(anchorHz ? (anchorHz - (x-0.5)*newSp) : getCenterHz(), newSp);
+  setCenterHz(fcNew);
+}
+zoomInBtn.onclick = ()=>applyZoom(1.5);
+zoomOutBtn.onclick = ()=>applyZoom(1/1.5);
+zoomFullBtn.onclick = ()=>setFullBand();
+
+function panFrac(frac){ const shift = frac * getSpan(); const fc = clampView(getCenterHz()+shift, getSpan()); setCenterHz(fc); }
+panLBtn.onclick = ()=>panFrac(-0.2);
+panRBtn.onclick = ()=>panFrac(+0.2);
+
+freezeBtn.onclick = ()=>{ isFrozen=!isFrozen; freezeBtn.textContent=isFrozen?'Unfreeze':'Freeze'; };
+resetBtn.onclick = ()=>{ setFullBand(); status('Reset 0…10 THz'); };
+
+span.oninput = ()=>{ setSpan(parseFloat(span.value)); };
+bw.oninput = ()=>{ const v=parseFloat(bw.value); bwLbl.textContent = v>=1e6? (v/1e6).toFixed(2)+" MHz": (v/1e3).toFixed(2)+" kHz"; };
+
+/* ---------- Interaktion Wasserfall ---------- */
+let isDown=false, startX=0, startFc=0, lastHz=null;
+wf.addEventListener('pointerdown', e=>{
+  wf.setPointerCapture(e.pointerId);
+  isDown=true; startX=e.clientX; startFc=getCenterHz(); lastHz=null; initAudio(); e.preventDefault();
+});
+wf.addEventListener('pointermove', e=>{
+  const rect = wf.getBoundingClientRect();
+  const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
+  if(isDown){
+    const dx = e.clientX - startX;
+    const shift = -dx/rect.width * getSpan();
+    const fcNew = clampView(startFc + shift, getSpan());
+    setCenterHz(fcNew);
+    const hz = xToHz(x);
+    playToneForFreq(hz);
+    lastHz = hz;
+  }else{
+    rxInfo.textContent = 'View: '+fmtHz(getCenterHz()-getSpan()/2)+' … '+fmtHz(getCenterHz()+getSpan()/2);
+  }
+});
+wf.addEventListener('pointerup', e=>{
+  wf.releasePointerCapture && wf.releasePointerCapture(e.pointerId);
+  isDown=false;
+  if(lastHz!=null){ setCenterHz(clampView(lastHz, getSpan())); lastHz=null; }
+});
+wf.addEventListener('dblclick', e=>{
+  const rect = wf.getBoundingClientRect();
+  const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
+  const hz = xToHz(x);
+  setCenterHz(clampView(hz, getSpan()));
+  status('Center: '+fmtHz(getCenterHz()));
+});
+wf.addEventListener('wheel', e=>{
+  e.preventDefault();
+  const rect = wf.getBoundingClientRect();
+  const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
+  const cursorHz = xToHz(x);
+  const factor = Math.pow(1.2, -Math.sign(e.deltaY));
+  applyZoom(factor, cursorHz);
+},{passive:false});
+
+/* ---------- Render ---------- */
+function drawSpectrum(now){
+  const W=spec.width,H=spec.height;
+  sctx.fillStyle='#0f1218'; sctx.fillRect(0,0,W,H);
+  for(let x=0;x<W;x++){
+    const hz = xToHz(x/W);
+    let v = 0.06 + 0.02*(Math.random()-0.5);
+    for(const s of signals){
+      const d = Math.abs(hz-s.f);
+      if(d < s.bw/2) v += 0.6*(1 - d/(s.bw/2));
+    }
+    v = clamp(v,0,1);
+    const y = H - Math.floor(v*H);
+    const r = Math.floor(30 + 220*v), g=Math.floor(50+120*v), b=Math.floor(100+150*v);
+    sctx.strokeStyle=`rgb(${r},${g},${b})`;
+    sctx.beginPath(); sctx.moveTo(x,H); sctx.lineTo(x,y); sctx.stroke();
+  }
+  const full = Math.abs(getSpan()-THZ_MAX) < 1;
+  sctx.fillStyle='#b8c1e1'; sctx.font='12px ui-monospace';
+  for(let i=0;i<=10;i++){
+    const f = full ? (THZ_MAX*(i/10)) : xToHz(i/10);
+    sctx.fillText(fmtHz(f), i*(W/10)+4, 14);
+  }
+}
+function drawWaterfall(now){
+  if(isFrozen) return;
+  const W=wf.width,H=wf.height;
+  const img = wctx.getImageData(0,0,W,H-1);
+  wctx.putImageData(img,0,1);
+  const line = wctx.createImageData(W,1);
+  for(let x=0;x<W;x++){
+    const hz = xToHz(x/W);
+    let v = 0.06 + 0.02*(Math.random()-0.5);
+    for(const s of signals){
+      const d = Math.abs(hz - s.f);
+      if(d < s.bw/2) v += 0.6*(1 - d/(s.bw/2));
+    }
+    v = clamp(v,0,1);
+    const r = Math.floor(40 + 200*Math.pow(v,1.1));
+    const g = Math.floor(20 + 200*Math.pow(v,0.9));
+    const b = Math.floor(80 + 220*v);
+    const idx = x*4;
+    line.data[idx]=r; line.data[idx+1]=g; line.data[idx+2]=b; line.data[idx+3]=255;
+  }
+  wctx.putImageData(line,0,0);
+}
+function loop(now){
+  drawSpectrum(now);
+  drawWaterfall(now);
+  const fMin = getCenterHz()-getSpan()/2, fMax=getCenterHz()+getSpan()/2;
+  rxInfo.textContent = 'View: '+fmtHz(fMin)+' … '+fmtHz(fMax)+' | Center '+fmtHz(getCenterHz())+' | Span '+fmtHz(getSpan());
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- Status ---------- */
+function status(msg){ statusEl.textContent=msg; setTimeout(()=>statusEl.textContent='bereit',2000); }
+</script>
+</body>
+</html>
