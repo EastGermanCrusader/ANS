@@ -6,451 +6,1169 @@
 <title>Starship COMMS SDR – 0…10 THz</title>
 <style>
   :root{--bg:#12151b;--fg:#d7e1ff;--muted:#8b95b7;--line:#273043}
-  *{box-sizing:border-box;font-family:ui-monospace,Consolas,monospace}
+  *{box-sizing:border-box;font-family:monospace,Courier,fixed}
   html,body{height:100%}
-  body{margin:0;background:var(--bg);color:var(--fg);min-height:100dvh;display:flex;flex-direction:column;overflow:hidden}
+  body{margin:0;background:#12151b;color:#d7e1ff;min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
 
-  /* WIP Banner (mit schwarz-gelben Streifen) */
-  .wip-banner{position:relative;height:40px;overflow:hidden;background:#000;z-index:2000;contain:content}
-  .wip-banner::before{
-    content:"";position:absolute;inset:0;pointer-events:none;opacity:.95;
-    background:repeating-linear-gradient(45deg,#000 0 20px,#ffd400 20px 40px);
-    animation:wipStripes 1.6s linear infinite;will-change:background-position
+  /* WIP Banner - Reduzierte Animation für GMod */
+  .wip-banner{position:relative;height:40px;overflow:hidden;background:#000;z-index:100}
+  .wip-stripes{
+    position:absolute;top:0;left:0;right:0;bottom:0;pointer-events:none;opacity:.8;
+    background:repeating-linear-gradient(45deg,#ffd400 0px,#ffd400 10px,#000 10px,#000 20px);
+    animation:wipStripes 2s linear infinite;
   }
+  @keyframes wipStripes{0%{transform:translateX(0)}100%{transform:translateX(20px)}}
   .wip-banner__text{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;gap:12px;
-    white-space:nowrap;line-height:40px;color:#fff;font-weight:900;letter-spacing:.12em;
-    text-shadow:0 0 2px #000,0 0 4px #000,0 0 6px rgba(0,0,0,.6);
-    animation:wipText 12s linear infinite
+    position:relative;display:flex;align-items:center;justify-content:center;gap:12px;
+    height:40px;white-space:nowrap;color:#fff;font-weight:bold;letter-spacing:.1em;
+    text-shadow:1px 1px 2px #000;
   }
-  .wip-btn{
-    appearance:none;border:1px solid #333;border-radius:6px;padding:4px 8px;background:#141414;color:#fff;cursor:pointer
-  }
-  @keyframes wipStripes{from{background-position:0 0}to{background-position:40px 0}}
-  @keyframes wipText{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+  .wip-btn{border:1px solid #333;border-radius:4px;padding:4px 8px;background:#141414;color:#fff;cursor:pointer}
 
-  header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:center}
-  .wrap{flex:1;min-height:0;display:grid;grid-template-columns:1fr 320px;gap:12px;padding:12px;overflow:hidden}
-  .maincol{display:flex;flex-direction:column;gap:8px;min-height:0}
-  canvas{background:#0a0c11;border:1px solid var(--line);border-radius:6px;display:block;touch-action:none;image-rendering:pixelated}
-  aside.panel{border:1px solid var(--line);border-radius:6px;padding:10px;background:#0f1218;display:grid;gap:10px;min-height:0;max-height:100%;overflow:auto}
-  input,select,button{background:#0b0e14;border:1px solid var(--line);border-radius:4px;color:var(--fg);padding:6px}
-  .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
-  .small{font-size:12px;color:var(--muted)}
-  footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);display:flex;justify-content:space-between}
-  @media (max-width: 900px){
-    .wrap{grid-template-columns:1fr;grid-auto-rows:minmax(0,auto)}
-    aside.panel{order:2}
-    .maincol{order:1}
+  header{padding:10px 12px;border-bottom:1px solid #273043;display:flex;gap:12px;align-items:center}
+  .wrap{flex:1;min-height:0;display:block;padding:12px;overflow:hidden}
+  .layout{display:table;width:100%;height:100%}
+  .maincol{display:table-cell;width:70%;vertical-align:top;padding-right:12px}
+  .sidecol{display:table-cell;width:30%;vertical-align:top;min-width:280px}
+  .canvas-container{position:relative;height:100%}
+  .spectrum-container{height:30%;margin-bottom:8px}
+  .waterfall-container{height:70%}
+  canvas{background:#0a0c11;border:1px solid #273043;border-radius:4px;display:block;width:100%;height:100%;image-rendering:pixelated}
+  aside.panel{border:1px solid #273043;border-radius:4px;padding:10px;background:#0f1218;height:100%;overflow-y:auto}
+  input,select,button{background:#0b0e14;border:1px solid #273043;border-radius:3px;color:#d7e1ff;padding:4px;font-size:12px}
+  .row{display:block;margin-bottom:8px}
+  .row label{display:inline-block;width:60px;font-size:11px;color:#8b95b7}
+  .row input,.row select{width:80px;margin-right:4px}
+  .row button{margin-right:4px}
+  .small{font-size:11px;color:#8b95b7}
+  footer{padding:6px 12px;border-top:1px solid #273043;color:#8b95b7;font-size:11px}
+  
+  /* GMod Media Queries vereinfacht */
+  @media (max-width: 800px){
+    .layout{display:block}
+    .maincol,.sidecol{display:block;width:100%;padding:0}
+    .sidecol{margin-top:12px}
   }
 </style>
 </head>
 <body>
-  <!-- WIP Banner mit Klick-Aufforderung -->
+  <!-- WIP Banner -->
   <div class="wip-banner">
-    <span class="wip-banner__text">
-      ⚠️ WORK IN PROGRESS – STARSHIP COMMS SDR PROTOTYP 0…10 THz ⚠️
-      <button id="audioStart" class="wip-btn" aria-label="Audio starten">Audio starten</button>
-      <button id="audioToggle" class="wip-btn" aria-label="Audio pausieren" style="display:none">Audio pausieren</button>
-    </span>
+    <div class="wip-stripes"></div>
+    <div class="wip-banner__text">
+      ⚠️ STARSHIP COMMS SDR PROTOTYP 0-10 THz (GMod) ⚠️
+      <button id="audioStart" class="wip-btn">Audio Start</button>
+      <button id="audioToggle" class="wip-btn" style="display:none">Audio Pause</button>
+    </div>
   </div>
 
   <header>
     <h1>STARSHIP COMMS SDR</h1>
-    <small class="small">Vollbild • Pan • Zoom • 0…10 THz</small>
+    <span class="small">Wheel=Zoom • Drag=Pan • Click=Listen • DblClick=Center</span>
   </header>
 
   <div class="wrap">
-    <div class="maincol" id="maincol">
-      <canvas id="spectrum"></canvas>
-      <canvas id="waterfall"></canvas>
+    <div class="layout">
+      <div class="maincol">
+        <div class="canvas-container">
+          <div class="spectrum-container">
+            <canvas id="spectrum"></canvas>
+          </div>
+          <div class="waterfall-container">
+            <canvas id="waterfall"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="sidecol">
+        <aside class="panel">
+          <div class="row">
+            <label>Freq:</label>
+            <input id="fCenter" type="number" step="1" min="0" max="10000000000000" value="5000000000000">
+            <select id="unit">
+              <option>Hz</option>
+              <option>kHz</option>
+              <option selected>MHz</option>
+              <option>GHz</option>
+              <option>THz</option>
+            </select>
+          </div>
+
+          <div class="row">
+            <label>Span:</label>
+            <input id="span" type="range" min="1000" max="10000000000000" step="1000000" value="10000000000000" style="width:150px">
+            <div class="small" id="spanLbl"></div>
+          </div>
+
+          <div class="row">
+            <button id="zoomIn">Zoom +</button>
+            <button id="zoomOut">Zoom -</button>
+            <button id="zoomFull">Full</button>
+          </div>
+
+          <div class="row">
+            <button id="panL">&lt; Pan</button>
+            <button id="panR">Pan &gt;</button>
+          </div>
+
+          <div class="row">
+            <label>Filter:</label>
+            <input id="bw" type="range" min="300" max="500000" step="100" value="2400" style="width:150px">
+            <div class="small" id="bwLbl">2.40 kHz (USB)</div>
+          </div>
+
+          <div class="row">
+            <label>Mode:</label>
+            <select id="mode">
+              <option>CW</option>
+              <option selected>USB</option>
+              <option>LSB</option>
+              <option>AM</option>
+              <option>FM</option>
+              <option>IQ</option>
+            </select>
+            <button id="freeze">Freeze</button>
+            <button id="reset">Reset</button>
+          </div>
+
+          <div class="small" id="rxInfo"></div>
+          <div class="small" id="status">Ready</div>
+        </aside>
+      </div>
     </div>
-
-    <aside class="panel" aria-label="Bedienfeld">
-      <div class="row small">
-        <span>Mittenfreq</span>
-        <input id="fCenter" type="number" step="1" min="0" max="10000000000000">
-        <select id="unit"><option>Hz</option><option>kHz</option><option selected>MHz</option><option>GHz</option><option>THz</option></select>
-      </div>
-
-      <div class="row small">
-        <span>Span</span>
-        <input id="span" type="range" min="1000" max="10000000000000" step="1000000" value="10000000000000" style="width:170px">
-        <span id="spanLbl"></span>
-      </div>
-
-      <div class="row small">
-        <button id="zoomIn">Zoom +</button>
-        <button id="zoomOut">Zoom −</button>
-        <button id="zoomFull">Max-Zoom-Out</button>
-      </div>
-
-      <div class="row small">
-        <button id="panL">◀ Pan</button>
-        <button id="panR">Pan ▶</button>
-      </div>
-
-      <div class="row small">
-        <span>Filter</span>
-        <input id="bw" type="range" min="300" max="500000" step="100" value="2400" style="width:170px">
-        <span id="bwLbl">2.40 kHz</span>
-      </div>
-
-      <div class="row small">
-        <span>Demod</span>
-        <select id="mode"><option>CW</option><option selected>USB</option><option>LSB</option><option>AM</option><option>FM</option><option>IQ</option></select>
-        <button id="freeze">Freeze</button>
-        <button id="reset">Reset</button>
-      </div>
-
-      <div class="small" id="rxInfo"></div>
-      <div class="small" id="status">bereit</div>
-    </aside>
   </div>
 
   <footer>
-    <div class="small">Wheel=Zoom | Drag=Pan | DblClick=Center | Full-Band=0…10 THz</div>
+    <div class="small">Passband colors indicate mode & filter width - Optimized for GMod Chromium</div>
   </footer>
 
 <script>
-/* ---------- Utils ---------- */
-const THZ_MAX = 10e12;
-const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
-const fmtHz=f=>{
-  const a=Math.abs(f);
-  if(a>=1e12) return (f/1e12).toFixed(3)+" THz";
-  if(a>=1e9)  return (f/1e9).toFixed(6)+" GHz";
-  if(a>=1e6)  return (f/1e6).toFixed(3)+" MHz";
-  if(a>=1e3)  return (f/1e3).toFixed(1)+" kHz";
-  return f.toFixed(0)+" Hz";
-};
-const UNIT={Hz:1,kHz:1e3,MHz:1e6,GHz:1e9,THz:1e12};
-const byUnit=(v,u)=>(UNIT[u]||1)*v;
+(function() {
+'use strict';
 
-/* ---------- DOM ---------- */
+/* ---------- GMod-optimierte Konstanten ---------- */
+const THZ_MAX = 10e12;
+const C_KMS = 299792.458;
+const FRAME_BUDGET = 16; // 60fps target für GMod
+const AUDIO_SAMPLE_RATE = 22050; // Reduziert für GMod
+const MAX_CANVAS_SIZE = 2048; // GMod Chromium Limit
+
+/* ---------- Optimierte Utils ---------- */
+const clamp = (v, a, b) => v < a ? a : v > b ? b : v;
+const rnd = (a, b) => a + Math.random() * (b - a);
+const fmtHz = (function() {
+  const cache = new Map();
+  return function(f) {
+    if (cache.has(f)) return cache.get(f);
+    let result;
+    const a = Math.abs(f);
+    if (a >= 1e12) result = (f/1e12).toFixed(3) + " THz";
+    else if (a >= 1e9) result = (f/1e9).toFixed(3) + " GHz";
+    else if (a >= 1e6) result = (f/1e6).toFixed(3) + " MHz";
+    else if (a >= 1e3) result = (f/1e3).toFixed(1) + " kHz";
+    else result = f.toFixed(0) + " Hz";
+    if (cache.size > 100) cache.clear(); // Prevent memory leak
+    cache.set(f, result);
+    return result;
+  };
+})();
+
+const UNIT = {Hz: 1, kHz: 1e3, MHz: 1e6, GHz: 1e9, THz: 1e12};
+const byUnit = (v, u) => (UNIT[u] || 1) * v;
+const doppler = (f0, v_kms) => f0 * (1 + v_kms / C_KMS);
+
+/* ---------- Mode Profiles ---------- */
+const MODEP = {
+  CW:  {scale: 0.4, min: 200,   max: 1200,  visual: 'sym',   audio: 'cw',  bfo: 650},
+  USB: {scale: 1.0, min: 1200,  max: 3200,  visual: 'upper', audio: 'ssb'},
+  LSB: {scale: 1.0, min: 1200,  max: 3200,  visual: 'lower', audio: 'ssb'},
+  AM:  {scale: 2.0, min: 3000,  max: 10000, visual: 'sym',   audio: 'am'},
+  FM:  {scale: 6.0, min: 8000,  max: 180000,visual: 'sym',   audio: 'fm'},
+  IQ:  {scale: 1.0, min: 1000,  max: 50000, visual: 'sym',   audio: 'iq'}
+};
+
+/* ---------- DOM Elemente ---------- */
 const spec = document.getElementById('spectrum');
 const wf = document.getElementById('waterfall');
-const sctx = spec.getContext('2d',{alpha:false});
-const wctx = wf.getContext('2d',{alpha:false});
-const maincol = document.getElementById('maincol');
+const sctx = spec.getContext('2d', {alpha: false});
+const wctx = wf.getContext('2d', {alpha: false});
 
 const fCenter = document.getElementById('fCenter');
 const unitSel = document.getElementById('unit');
 const span = document.getElementById('span');
 const spanLbl = document.getElementById('spanLbl');
-const bw = document.getElementById('bw');
+const bwEl = document.getElementById('bw');
 const bwLbl = document.getElementById('bwLbl');
+const modeSel = document.getElementById('mode');
+
 const rxInfo = document.getElementById('rxInfo');
 const statusEl = document.getElementById('status');
-
-const zoomInBtn = document.getElementById('zoomIn');
-const zoomOutBtn = document.getElementById('zoomOut');
-const zoomFullBtn = document.getElementById('zoomFull');
-const panLBtn = document.getElementById('panL');
-const panRBtn = document.getElementById('panR');
-const freezeBtn = document.getElementById('freeze');
-const resetBtn = document.getElementById('reset');
-
 const audioStartBtn = document.getElementById('audioStart');
 const audioToggleBtn = document.getElementById('audioToggle');
 
-/* ---------- State ---------- */
-let isFrozen=false;
-let spanVirtual = THZ_MAX;
-let statusTimer=0;
+/* ---------- Optimierte State Management ---------- */
+let state = {
+  isFrozen: false,
+  spanVirtual: THZ_MAX,
+  listenHz: null,
+  audioCtx: null,
+  audioNodes: {},
+  lastFrameTime: 0,
+  frameSkip: 0
+};
 
-/* ---------- Signals ---------- */
-const signals = [
-  {name:'H-Linie', f:1.420405751e9, bw:12000},
-  {name:'H2O',     f:22.235e9,      bw:60000},
-  {name:'CW',      f:7.023e6,       bw:400},
-  {name:'THz Tel', f:2.3e12,        bw:5e6}
-];
-for(let i=0;i<80;i++){
-  signals.push({name:'NB'+i, f:Math.random()*THZ_MAX, bw:(300+Math.random()*15000)});
+/* ---------- Signal Generator (Optimiert) ---------- */
+function generateSignals() {
+  const signals = {
+    astroLines: [],
+    spurs: [],
+    pulsars: [],
+    bursts: [],
+    flares: []
+  };
+  
+  // Reduzierte Anzahl für GMod Performance
+  const astroCount = 5;
+  const spurCount = 8;
+  
+  // Astro Lines
+  const baseLines = [
+    ['H I', 1.420405751e9],
+    ['OH 1612', 1.612231e9],
+    ['OH 1665', 1.6654018e9],
+    ['CO(1-0)', 115.2712018e9],
+    ['[C II]', 1.900539e12]
+  ];
+  
+  for (let i = 0; i < Math.min(astroCount, baseLines.length); i++) {
+    const [name, f0] = baseLines[i];
+    const v = rnd(-200, 200);
+    const f = doppler(f0, v);
+    const bw = Math.max(500, f * (rnd(5, 50) / C_KMS));
+    signals.astroLines.push({name, f, bw, amp: rnd(0.4, 0.7)});
+  }
+  
+  // Spurs
+  for (let i = 0; i < spurCount; i++) {
+    signals.spurs.push({
+      f: Math.random() * THZ_MAX,
+      bw: rnd(200, 8000),
+      amp: rnd(0.15, 0.35)
+    });
+  }
+  
+  // Pulsars (vereinfacht)
+  const pulsarCount = 2;
+  const t0 = performance.now() / 1000;
+  for (let i = 0; i < pulsarCount; i++) {
+    const fmin = rnd(50e6, 800e6);
+    signals.pulsars.push({
+      fmin,
+      fmax: fmin + rnd(50e6, 300e6),
+      period: rnd(0.3, 1.2),
+      duty: rnd(0.05, 0.08),
+      amp: rnd(0.4, 0.6),
+      t0: t0 + rnd(0, 3)
+    });
+  }
+  
+  return signals;
 }
 
-/* ---------- Freq helpers ---------- */
-function setCenterHz(f){ const u=unitSel.value; fCenter.value=(f/byUnit(1,u)).toFixed(3); }
-function getCenterHz(){ return byUnit(parseFloat(fCenter.value||0), unitSel.value); }
-function getSpan(){ return spanVirtual; }
-function setSpan(v){ spanVirtual = clamp(v, 1e3, THZ_MAX); span.value = Math.min(spanVirtual, 1e13); spanLbl.textContent = fmtHz(spanVirtual); }
-function xToHz(x){ const fc=getCenterHz(), sp=getSpan(); return fc + (x-0.5)*sp; }
-function hzToX(hz){ const fc=getCenterHz(), sp=getSpan(); return ((hz - fc)/sp) + 0.5; }
-function clampView(fc, sp){
-  let fMin = fc - sp/2, fMax = fc + sp/2;
-  if(fMin < 0){ fc += -fMin; }
-  if(fMax > THZ_MAX){ fc -= (fMax-THZ_MAX); }
+const signals = generateSignals();
+
+/* ---------- Optimierte Signal Processing ---------- */
+const signalCache = {
+  lastHz: -1,
+  lastT: -1,
+  lastPxHz: -1,
+  cachedValue: 0,
+  cacheHits: 0
+};
+
+function getSignalPower(hz, t, pxHz) {
+  // Simple caching für häufige Aufrufe
+  const cacheKey = Math.floor(hz / 1000) * 1000;
+  if (signalCache.lastHz === cacheKey && Math.abs(signalCache.lastT - t) < 0.1) {
+    signalCache.cacheHits++;
+    return signalCache.cachedValue + (Math.random() - 0.5) * 0.02;
+  }
+  
+  let power = 0.03 + (Math.random() - 0.5) * 0.015;
+  
+  // Astro lines
+  for (const s of signals.astroLines) {
+    const half = Math.max(s.bw * 0.5, pxHz * 0.5);
+    const d = Math.abs(hz - s.f);
+    if (d < half) {
+      power += s.amp * (1 - d / half);
+    }
+  }
+  
+  // Spurs
+  for (const s of signals.spurs) {
+    const half = Math.max(s.bw * 0.5, pxHz);
+    const d = Math.abs(hz - s.f);
+    if (d < half) {
+      power += s.amp * (1 - d / half);
+    }
+  }
+  
+  // Pulsars (vereinfacht)
+  for (const p of signals.pulsars) {
+    if (hz >= p.fmin && hz <= p.fmax) {
+      const phase = ((t - p.t0) % p.period + p.period) % p.period;
+      if (phase < p.period * p.duty) {
+        power += p.amp * 0.8;
+      }
+    }
+  }
+  
+  // Cache update
+  signalCache.lastHz = cacheKey;
+  signalCache.lastT = t;
+  signalCache.lastPxHz = pxHz;
+  signalCache.cachedValue = power;
+  
+  return Math.max(0, power);
+}
+
+/* ---------- Frequency Management ---------- */
+function setCenterHz(f) {
+  const u = unitSel.value;
+  fCenter.value = (f / byUnit(1, u)).toFixed(3);
+}
+
+function getCenterHz() {
+  return byUnit(parseFloat(fCenter.value) || 0, unitSel.value);
+}
+
+function getSpan() {
+  return state.spanVirtual;
+}
+
+function setSpan(v) {
+  state.spanVirtual = clamp(v, 1e3, THZ_MAX);
+  span.value = Math.min(state.spanVirtual, 1e13);
+  spanLbl.textContent = fmtHz(state.spanVirtual);
+}
+
+function xToHz(x) {
+  const fc = getCenterHz();
+  const sp = getSpan();
+  return fc + (x - 0.5) * sp;
+}
+
+function hzToX(hz) {
+  const fc = getCenterHz();
+  const sp = getSpan();
+  return ((hz - fc) / sp) + 0.5;
+}
+
+function clampView(fc, sp) {
+  let fMin = fc - sp / 2;
+  let fMax = fc + sp / 2;
+  if (fMin < 0) fc += -fMin;
+  if (fMax > THZ_MAX) fc -= (fMax - THZ_MAX);
   return fc;
 }
 
-/* ---------- Full-Band ---------- */
-function setFullBand(){ setSpan(THZ_MAX); setCenterHz(THZ_MAX/2); }
-setFullBand();
-bwLbl.textContent = (bw.value/1e3).toFixed(2)+" kHz";
-
-/* ---------- Responsive canvases ---------- */
-function resizeCanvas(c, cssW, cssH){
-  const dpr = Math.max(1, Math.floor((window.devicePixelRatio||1)));
-  c.style.width = cssW + 'px';
-  c.style.height = cssH + 'px';
-  const w = Math.max(1, (cssW|0) * dpr);
-  const h = Math.max(1, (cssH|0) * dpr);
-  if (c.width!==w) c.width=w;
-  if (c.height!==h) c.height=h;
-}
-function layout(){
-  const r = maincol.getBoundingClientRect();
-  const W = Math.max(1, r.width|0);
-  const H = Math.max(1, r.height|0);
-  const specH = Math.max(120, (H * 0.28)|0);
-  const wfH   = Math.max(160, H - specH - 8);
-  resizeCanvas(spec, W, specH);
-  resizeCanvas(wf,   W, wfH);
-}
-window.addEventListener('resize', layout, {passive:true});
-window.addEventListener('orientationchange', layout, {passive:true});
-new ResizeObserver(layout).observe(maincol);
-layout();
-
-/* ---------- Audio: Klick zum Start, kosmisches Hintergrundrauschen ---------- */
-let audioCtx=null, mainOsc=null, mainGain=null, noiseSrc=null, noiseGain=null, noiseFilter=null;
-function initAudio(){
-  if(audioCtx) return;
-  const Ctx = window.AudioContext||window.webkitAudioContext;
-  if(!Ctx) return;
-  audioCtx = new Ctx();
-
-  // Haupt-Oszillator für „Tuning“-Piep
-  mainOsc = audioCtx.createOscillator();
-  mainGain = audioCtx.createGain();
-  mainGain.gain.value = 0; // stumm, nur bei Nähe zu Signalen anheben
-  mainOsc.type='sine'; mainOsc.frequency.value=600;
-  mainOsc.connect(mainGain).connect(audioCtx.destination);
-  mainOsc.start();
-
-  // Kosmisches Hintergrundrauschen: breites Rauschen, leicht gefiltert
-  const len = audioCtx.sampleRate * 2; // 2s Puffer
-  const noiseBuf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-  const ch = noiseBuf.getChannelData(0);
-  for(let i=0;i<len;i++){
-    // weißes Rauschen
-    ch[i] = (Math.random()*2-1) * 0.25;
+/* ---------- Canvas Management (GMod optimiert) ---------- */
+function resizeCanvas(canvas, container) {
+  const rect = container.getBoundingClientRect();
+  const dpr = 1; // Feste DPR für GMod Kompatibilität
+  const w = Math.min(MAX_CANVAS_SIZE, Math.max(32, rect.width * dpr));
+  const h = Math.min(MAX_CANVAS_SIZE, Math.max(32, rect.height * dpr));
+  
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+    return true;
   }
-  // Quelle
-  noiseSrc = audioCtx.createBufferSource();
-  noiseSrc.buffer = noiseBuf;
-  noiseSrc.loop = true;
-
-  // Sanfter Bandpass ~300..3500 Hz (hörbarer „Weltraum“-Hiss, nicht schrill)
-  noiseFilter = audioCtx.createBiquadFilter();
-  noiseFilter.type = 'bandpass';
-  noiseFilter.frequency.value = 1200;
-  noiseFilter.Q.value = 0.6;
-
-  // Lautstärke des Rauschens
-  noiseGain = audioCtx.createGain();
-  noiseGain.gain.value = 0.06; // sehr dezent
-
-  noiseSrc.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
+  return false;
 }
 
-function startNoise(){
-  if(!audioCtx) return;
-  try{ noiseSrc && noiseSrc.start(0); }catch(e){/* bereits gestartet */}
-}
-function stopNoise(){
-  if(!audioCtx) return;
-  try{ noiseSrc && noiseSrc.stop(0); }catch(e){/* bereits gestoppt */}
+function layout() {
+  const specContainer = document.querySelector('.spectrum-container');
+  const wfContainer = document.querySelector('.waterfall-container');
+  
+  resizeCanvas(spec, specContainer);
+  resizeCanvas(wf, wfContainer);
 }
 
-/* UI-Buttons für Audio */
-let audioRunning=false;
-audioStartBtn.addEventListener('click', ()=>{
-  if(!audioCtx) { initAudio(); }
-  startNoise();
-  audioRunning=true;
-  audioStartBtn.style.display='none';
-  audioToggleBtn.style.display='';
-  audioToggleBtn.textContent='Audio pausieren';
-  status('Audio gestartet');
-},{passive:true});
-
-audioToggleBtn.addEventListener('click', ()=>{
-  if(!audioCtx) return;
-  if(audioRunning){
-    stopNoise();
-    audioRunning=false;
-    audioToggleBtn.textContent='Audio fortsetzen';
-    status('Audio pausiert');
-  }else{
-    // neues BufferSource-Objekt erzeugen, wenn gestoppt
-    const len = audioCtx.sampleRate * 2;
-    const nb = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
-    const ch = nb.getChannelData(0);
-    for(let i=0;i<len;i++){ ch[i] = (Math.random()*2-1)*0.25; }
-    noiseSrc = audioCtx.createBufferSource();
-    noiseSrc.buffer = nb;
-    noiseSrc.loop = true;
-    noiseSrc.connect(noiseFilter).connect(noiseGain).connect(audioCtx.destination);
-    startNoise();
-    audioRunning=true;
-    audioToggleBtn.textContent='Audio pausieren';
-    status('Audio fortgesetzt');
+/* ---------- Audio System (Browser-kompatibel) ---------- */
+function initAudio() {
+  if (state.audioCtx) return true;
+  
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) {
+      console.warn('AudioContext not supported');
+      return false;
+    }
+    
+    state.audioCtx = new AudioContext();
+    
+    // Audio chain für realistische SDR-Sounds
+    state.audioNodes.gate = state.audioCtx.createGain();
+    state.audioNodes.gate.gain.value = 0;
+    
+    state.audioNodes.osc = state.audioCtx.createOscillator();
+    state.audioNodes.osc.type = 'sine';
+    state.audioNodes.osc.frequency.value = 600;
+    
+    state.audioNodes.oscGain = state.audioCtx.createGain();
+    state.audioNodes.oscGain.gain.value = 0.1;
+    
+    // Noise source - längerer Buffer für bessere Qualität
+    const bufferSize = state.audioCtx.sampleRate * 4;
+    const buffer = state.audioCtx.createBuffer(1, bufferSize, state.audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * 0.3;
+    }
+    
+    state.audioNodes.noise = state.audioCtx.createBufferSource();
+    state.audioNodes.noise.buffer = buffer;
+    state.audioNodes.noise.loop = true;
+    
+    state.audioNodes.noiseFilter = state.audioCtx.createBiquadFilter();
+    state.audioNodes.noiseGain = state.audioCtx.createGain();
+    state.audioNodes.noiseGain.gain.value = 0.1;
+    
+    // Connect audio graph
+    state.audioNodes.osc.connect(state.audioNodes.oscGain).connect(state.audioNodes.gate);
+    state.audioNodes.noise.connect(state.audioNodes.noiseFilter)
+                           .connect(state.audioNodes.noiseGain)
+                           .connect(state.audioNodes.gate);
+    
+    state.audioNodes.gate.connect(state.audioCtx.destination);
+    
+    state.audioNodes.osc.start();
+    
+    console.log('Audio system initialized');
+    return true;
+  } catch (e) {
+    console.error('Audio init failed:', e);
+    return false;
   }
-},{passive:true});
-
-/* Tuning-Ton abhängig von Cursor-Frequenz */
-function playToneForFreq(hz){
-  if(!audioCtx) return;
-  const base = Math.log10(Math.max(1,hz));
-  const aud = 220 * Math.pow(10, (base - 3) * 0.25);
-  const nearest = signals.reduce((a,s)=> Math.abs(s.f-hz)<Math.abs(a.f-hz)?s:a, signals[0]);
-  const prox = Math.max(0, 1 - Math.abs(nearest.f - hz) / Math.max(1, nearest.bw*2));
-  mainOsc.frequency.setTargetAtTime(clamp(aud,80,6000), audioCtx.currentTime, 0.02);
-  mainGain.gain.setTargetAtTime(0.02 + 0.18 * prox, audioCtx.currentTime, 0.02);
 }
 
-/* ---------- Controls ---------- */
-function applyZoom(factor, anchorHz=null){
+/* ---------- Rendering (Performance optimiert) ---------- */
+const renderData = {
+  spectrumData: null,
+  waterfallLine: null,
+  lastWidth: 0
+};
+
+function ensureBuffers(width) {
+  if (renderData.lastWidth !== width) {
+    renderData.spectrumData = new Float32Array(width);
+    renderData.waterfallLine = new ImageData(width, 1);
+    renderData.lastWidth = width;
+  }
+}
+
+function drawSpectrum() {
+  const W = spec.width;
+  const H = spec.height;
+  if (W < 1 || H < 1) return;
+  
+  ensureBuffers(W);
+  
+  const t = performance.now() / 1000;
+  const pxHz = getSpan() / W;
+  const data = renderData.spectrumData;
+  
+  let vmax = 0.1;
+  
+  // Generate spectrum data
+  for (let x = 0; x < W; x++) {
+    const hz = xToHz(x / W);
+    const v = getSignalPower(hz, t, pxHz);
+    data[x] = v;
+    if (v > vmax) vmax = v;
+  }
+  
+  // Clear and draw
+  sctx.fillStyle = '#0f1218';
+  sctx.fillRect(0, 0, W, H);
+  
+  // Draw spectrum line
+  sctx.strokeStyle = '#87a3ff';
+  sctx.lineWidth = 1;
+  sctx.beginPath();
+  
+  const gain = 1 / vmax;
+  for (let x = 0; x < W; x++) {
+    const y = H - (clamp(data[x] * gain, 0, 1) * H);
+    if (x === 0) sctx.moveTo(x, y);
+    else sctx.lineTo(x, y);
+  }
+  sctx.stroke();
+  
+  // Draw frequency labels (simplified)
+  sctx.fillStyle = '#b8c1e1';
+  sctx.font = '10px monospace';
+  const labelCount = 5;
+  for (let i = 0; i <= labelCount; i++) {
+    const f = xToHz(i / labelCount);
+    const x = (i * W / labelCount);
+    sctx.fillText(fmtHz(f), x + 2, 12);
+  }
+  
+  drawOverlays(sctx, W, H, pxHz);
+}
+
+function drawWaterfall() {
+  if (state.isFrozen) return;
+  
+  const W = wf.width;
+  const H = wf.height;
+  if (W < 1 || H < 1) return;
+  
+  ensureBuffers(W);
+  
+  // Scroll existing content up
+  if (H > 1) {
+    wctx.drawImage(wf, 0, 0, W, H - 1, 0, 1, W, H - 1);
+  }
+  
+  const t = performance.now() / 1000;
+  const pxHz = getSpan() / W;
+  const lineData = renderData.waterfallLine;
+  const pixels = lineData.data;
+  
+  let vmax = 0.1;
+  
+  // Generate line data
+  for (let x = 0; x < W; x++) {
+    const hz = xToHz(x / W);
+    const v = getSignalPower(hz, t, pxHz);
+    if (v > vmax) vmax = v;
+    
+    const intensity = clamp(v / vmax, 0, 1);
+    const r = Math.floor(40 + 200 * Math.pow(intensity, 1.2));
+    const g = Math.floor(20 + 180 * intensity);
+    const b = Math.floor(80 + 175 * intensity);
+    
+    const i = x * 4;
+    pixels[i] = r;
+    pixels[i + 1] = g;
+    pixels[i + 2] = b;
+    pixels[i + 3] = 255;
+  }
+  
+  // Draw new line at top
+  wctx.putImageData(lineData, 0, 0);
+  
+  drawOverlays(wctx, W, H, pxHz);
+}
+
+function drawOverlays(ctx, W, H, pxHz) {
+  const fc = getCenterHz();
+  const sp = getSpan();
+  const fmin = fc - sp / 2;
+  
+  ctx.save();
+  
+  // Astro line markers
+  ctx.fillStyle = '#ffc94d';
+  for (const s of signals.astroLines) {
+    if (s.f >= fmin && s.f <= fmin + sp) {
+      const x = ((s.f - fmin) / sp) * W;
+      ctx.fillRect(x, 0, Math.max(1, pxHz / sp * W * 2), 4);
+    }
+  }
+  
+  // Passband overlay - STATISCH (läuft nicht mit)
+  if (state.listenHz !== null) {
+    const pb = getCurrentPassband();
+    if (pb) {
+      const xL = ((pb.lo - fmin) / sp) * W;
+      const xH = ((pb.hi - fmin) / sp) * W;
+      const xC = ((pb.center - fmin) / sp) * W;
+      const mode = modeSel.value;
+      
+      // Passband-Bereich
+      const colors = {
+        sym: 'rgba(0,200,255,0.15)',
+        upper: 'rgba(0,255,160,0.15)',
+        lower: 'rgba(255,120,0,0.15)'
+      };
+      
+      const visual = MODEP[mode].visual;
+      ctx.fillStyle = colors[visual] || colors.sym;
+      ctx.fillRect(Math.max(0, xL), 0, Math.max(1, xH - xL), H);
+      
+      // Passband-Ränder
+      ctx.strokeStyle = ctx.fillStyle.replace('0.15', '0.6');
+      ctx.lineWidth = 2;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(xL, 0);
+      ctx.lineTo(xL, H);
+      ctx.moveTo(xH, 0);
+      ctx.lineTo(xH, H);
+      ctx.stroke();
+      
+      // Zentralfrequenz-Linie
+      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(xC, 0);
+      ctx.lineTo(xC, H);
+      ctx.stroke();
+      
+      // Frequenz-Label
+      ctx.fillStyle = 'rgba(255,255,255,0.9)';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(fmtHz(state.listenHz), xC + 4, 16);
+      ctx.fillText(`${mode} ${fmtHz(getEffectiveBandwidth())}`, xC + 4, 28);
+      
+      ctx.setLineDash([]);
+    }
+  }
+  
+  ctx.restore();
+}
+
+function getCurrentPassband() {
+  if (state.listenHz === null) return null;
+  
+  const bw = getEffectiveBandwidth();
+  const mode = modeSel.value;
+  
+  if (mode === 'USB') {
+    return {lo: state.listenHz, hi: state.listenHz + bw, center: state.listenHz};
+  } else if (mode === 'LSB') {
+    return {lo: state.listenHz - bw, hi: state.listenHz, center: state.listenHz};
+  } else {
+    return {lo: state.listenHz - bw/2, hi: state.listenHz + bw/2, center: state.listenHz};
+  }
+}
+
+function getEffectiveBandwidth() {
+  const m = MODEP[modeSel.value];
+  const base = parseFloat(bwEl.value) || 2400;
+  return clamp(base * m.scale, m.min, m.max);
+}
+
+/* ---------- Main Loop (Frame-limiting für GMod) ---------- */
+function mainLoop() {
+  const now = performance.now();
+  if (now - state.lastFrameTime < FRAME_BUDGET) {
+    state.frameSkip++;
+    if (state.frameSkip < 2) {
+      requestAnimationFrame(mainLoop);
+      return;
+    }
+  }
+  
+  state.frameSkip = 0;
+  state.lastFrameTime = now;
+  
+  try {
+    drawSpectrum();
+    drawWaterfall();
+    updateInfo();
+  } catch (e) {
+    console.warn('Render error:', e);
+  }
+  
+  requestAnimationFrame(mainLoop);
+}
+
+function updateInfo() {
+  const fc = getCenterHz();
+  const sp = getSpan();
+  const fMin = fc - sp / 2;
+  const fMax = fc + sp / 2;
+  
+  rxInfo.textContent = `View: ${fmtHz(fMin)} … ${fmtHz(fMax)} | Center: ${fmtHz(fc)}`;
+}
+
+/* ---------- Event Handlers ---------- */
+function setupControls() {
+  // Zoom controls
+  document.getElementById('zoomIn').onclick = () => {
+    applyZoom(1.5);
+  };
+  
+  document.getElementById('zoomOut').onclick = () => {
+    applyZoom(1/1.5);
+  };
+  
+  document.getElementById('zoomFull').onclick = () => {
+    setFullBand();
+  };
+  
+  // Pan controls
+  document.getElementById('panL').onclick = () => {
+    panBy(-0.2);
+  };
+  
+  document.getElementById('panR').onclick = () => {
+    panBy(0.2);
+  };
+  
+  // Other controls
+  document.getElementById('freeze').onclick = () => {
+    state.isFrozen = !state.isFrozen;
+    document.getElementById('freeze').textContent = state.isFrozen ? 'Unfreeze' : 'Freeze';
+  };
+  
+  document.getElementById('reset').onclick = () => {
+    setFullBand();
+    state.listenHz = null;
+    setStatus('Reset to full band');
+  };
+  
+  // Input handlers
+  span.oninput = () => {
+    setSpan(parseFloat(span.value));
+  };
+  
+  unitSel.onchange = () => {
+    setCenterHz(getCenterHz());
+  };
+  
+  bwEl.oninput = updateBwLabel;
+  modeSel.onchange = () => {
+    updateBwLabel();
+    applyAudioProfile();
+  };
+  
+  // Audio controls
+  audioStartBtn.onclick = async () => {
+    try {
+      // AudioContext muss durch User-Interaction gestartet werden
+      if (state.audioCtx && state.audioCtx.state === 'suspended') {
+        await state.audioCtx.resume();
+      }
+      
+      if (initAudio() && state.audioNodes.noise) {
+        await state.audioNodes.noise.start();
+        applyAudioProfile();
+        
+        audioStartBtn.style.display = 'none';
+        audioToggleBtn.style.display = '';
+        audioToggleBtn.textContent = 'Audio Pause';
+        
+        // Initial audio enable
+        if (state.audioNodes.gate) {
+          state.audioNodes.gate.gain.setTargetAtTime(0.3, state.audioCtx.currentTime, 0.1);
+        }
+        
+        setStatus('Audio started - Click to tune');
+        console.log('Audio successfully started');
+      } else {
+        throw new Error('Audio initialization failed');
+      }
+    } catch (e) {
+      console.error('Audio start error:', e);
+      setStatus('Audio failed: ' + e.message);
+    }
+  };
+  
+  audioToggleBtn.onclick = () => {
+    if (!state.audioCtx || !state.audioNodes.gate) return;
+    
+    const currentGain = state.audioNodes.gate.gain.value;
+    const newGain = currentGain > 0.1 ? 0 : 0.3;
+    
+    state.audioNodes.gate.gain.setTargetAtTime(newGain, state.audioCtx.currentTime, 0.1);
+    audioToggleBtn.textContent = newGain > 0 ? 'Audio Pause' : 'Audio Resume';
+    
+    if (newGain > 0) {
+      updateAudio(); // Refresh audio when resuming
+    }
+  };
+}
+
+function applyZoom(factor, anchorHz = null) {
   const sp = getSpan();
   const newSp = clamp(sp / factor, 1e3, THZ_MAX);
   const x = anchorHz ? hzToX(anchorHz) : 0.5;
   setSpan(newSp);
-  const fcNew = clampView(anchorHz ? (anchorHz - (x-0.5)*newSp) : getCenterHz(), newSp);
+  const fcNew = clampView(anchorHz ? (anchorHz - (x - 0.5) * newSp) : getCenterHz(), newSp);
   setCenterHz(fcNew);
 }
-zoomInBtn.onclick = ()=>applyZoom(1.5);
-zoomOutBtn.onclick = ()=>applyZoom(1/1.5);
-zoomFullBtn.onclick = ()=>setFullBand();
 
-function panFrac(frac){ const shift = frac * getSpan(); const fc = clampView(getCenterHz()+shift, getSpan()); setCenterHz(fc); }
-panLBtn.onclick = ()=>panFrac(-0.2);
-panRBtn.onclick = ()=>panFrac(+0.2);
+function panBy(fraction) {
+  const shift = fraction * getSpan();
+  const fc = clampView(getCenterHz() + shift, getSpan());
+  setCenterHz(fc);
+}
 
-freezeBtn.onclick = ()=>{ isFrozen=!isFrozen; freezeBtn.textContent=isFrozen?'Unfreeze':'Freeze'; };
-resetBtn.onclick = ()=>{ setFullBand(); status('Reset 0…10 THz'); };
+function setFullBand() {
+  setSpan(THZ_MAX);
+  setCenterHz(THZ_MAX / 2);
+}
 
-span.oninput = ()=>{ setSpan(parseFloat(span.value)); };
-bw.oninput = ()=>{ const v=parseFloat(bw.value); bwLbl.textContent = v>=1e6? (v/1e6).toFixed(2)+" MHz": (v/1e3).toFixed(2)+" kHz"; };
-unitSel.onchange = ()=>{ setCenterHz(getCenterHz()); };
+function updateBwLabel() {
+  const eff = getEffectiveBandwidth();
+  const mode = modeSel.value;
+  const label = eff >= 1e6 ? 
+    (eff / 1e6).toFixed(2) + ' MHz' : 
+    (eff / 1e3).toFixed(2) + ' kHz';
+  bwLbl.textContent = label + ' (' + mode + ')';
+}
 
-/* ---------- Interaktion Wasserfall ---------- */
-let isDown=false, startX=0, startFc=0, lastHz=null;
-wf.addEventListener('pointerdown', e=>{
-  wf.setPointerCapture && wf.setPointerCapture(e.pointerId);
-  isDown=true; startX=e.clientX; startFc=getCenterHz(); lastHz=null; e.preventDefault();
-},{passive:false});
-wf.addEventListener('pointermove', e=>{
-  const rect = wf.getBoundingClientRect();
-  const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
-  if(isDown){
-    const dx = e.clientX - startX;
-    const shift = -dx/rect.width * getSpan();
+function setStatus(msg) {
+  statusEl.textContent = msg;
+  setTimeout(() => {
+    statusEl.textContent = 'Ready';
+  }, 2000);
+}
+
+function applyAudioProfile() {
+  if (!state.audioCtx || !state.audioNodes.noiseFilter) return;
+  
+  const mode = MODEP[modeSel.value];
+  const ctx = state.audioCtx;
+  const filter = state.audioNodes.noiseFilter;
+  const oscGain = state.audioNodes.oscGain;
+  const noiseGain = state.audioNodes.noiseGain;
+  
+  switch (mode.audio) {
+    case 'cw':
+      filter.type = 'bandpass';
+      filter.frequency.value = mode.bfo;
+      filter.Q.value = 8;
+      oscGain.gain.setTargetAtTime(0.08, ctx.currentTime, 0.1);
+      noiseGain.gain.setTargetAtTime(0.05, ctx.currentTime, 0.1);
+      break;
+      
+    case 'ssb':
+      filter.type = 'bandpass';
+      filter.frequency.value = 1500;
+      filter.Q.value = 0.9;
+      oscGain.gain.setTargetAtTime(0.06, ctx.currentTime, 0.1);
+      noiseGain.gain.setTargetAtTime(0.06, ctx.currentTime, 0.1);
+      break;
+      
+    case 'am':
+      filter.type = 'lowpass';
+      filter.frequency.value = 4000;
+      filter.Q.value = 0.707;
+      oscGain.gain.setTargetAtTime(0.04, ctx.currentTime, 0.1);
+      noiseGain.gain.setTargetAtTime(0.08, ctx.currentTime, 0.1);
+      break;
+      
+    case 'fm':
+      filter.type = 'lowpass';
+      filter.frequency.value = 5000;
+      filter.Q.value = 0.707;
+      oscGain.gain.setTargetAtTime(0.05, ctx.currentTime, 0.1);
+      noiseGain.gain.setTargetAtTime(0.07, ctx.currentTime, 0.1);
+      break;
+      
+    default: // iq
+      filter.type = 'bandpass';
+      filter.frequency.value = 1500;
+      filter.Q.value = 0.7;
+      oscGain.gain.setTargetAtTime(0.05, ctx.currentTime, 0.1);
+      noiseGain.gain.setTargetAtTime(0.06, ctx.currentTime, 0.1);
+      break;
+  }
+}
+
+/* ---------- Mouse/Touch Interaction (GMod-optimiert) ---------- */
+function setupInteraction() {
+  let isDown = false;
+  let startX = 0;
+  let startFc = 0;
+  let movedPixels = 0;
+  
+  function getEventX(e) {
+    return e.clientX || (e.touches && e.touches[0] && e.touches[0].clientX) || 0;
+  }
+  
+  function handleStart(e) {
+    e.preventDefault();
+    isDown = true;
+    startX = getEventX(e);
+    startFc = getCenterHz();
+    movedPixels = 0;
+  }
+  
+  function handleMove(e) {
+    if (!isDown) return;
+    
+    const rect = wf.getBoundingClientRect();
+    const currentX = getEventX(e);
+    const dx = currentX - startX;
+    movedPixels = Math.max(movedPixels, Math.abs(dx));
+    
+    const shift = -dx / rect.width * getSpan();
     const fcNew = clampView(startFc + shift, getSpan());
     setCenterHz(fcNew);
+  }
+  
+  function handleEnd(e) {
+    if (!isDown) return;
+    isDown = false;
+    
+    if (movedPixels < 5) {
+      // Click to tune
+      const rect = wf.getBoundingClientRect();
+      const x = clamp((getEventX(e) - rect.left) / rect.width, 0, 1);
+      state.listenHz = xToHz(x);
+      setStatus(`Tuned to ${fmtHz(state.listenHz)} | ${modeSel.value}`);
+      updateAudio();
+    }
+  }
+  
+  function handleWheel(e) {
+    e.preventDefault();
+    const rect = wf.getBoundingClientRect();
+    const x = clamp((e.clientX - rect.left) / rect.width, 0, 1);
+    const cursorHz = xToHz(x);
+    const factor = Math.pow(1.3, -Math.sign(e.deltaY)); // Stärkerer Zoom-Faktor
+    applyZoom(factor, cursorHz);
+  }
+  
+  function handleDoubleClick(e) {
+    const rect = wf.getBoundingClientRect();
+    const x = clamp((e.clientX - rect.left) / rect.width, 0, 1);
     const hz = xToHz(x);
-    playToneForFreq(hz);
-    lastHz = hz;
-  }else{
-    rxInfo.textContent = 'View: '+fmtHz(getCenterHz()-getSpan()/2)+' … '+fmtHz(getCenterHz()+getSpan()/2);
+    setCenterHz(clampView(hz, getSpan()));
+    setStatus('Centered on ' + fmtHz(hz));
   }
-},{passive:true});
-wf.addEventListener('pointerup', e=>{
-  wf.releasePointerCapture && wf.releasePointerCapture(e.pointerId);
-  isDown=false;
-  if(lastHz!=null){ setCenterHz(clampView(lastHz, getSpan())); lastHz=null; }
-},{passive:true});
-wf.addEventListener('dblclick', e=>{
-  const rect = wf.getBoundingClientRect();
-  const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
-  const hz = xToHz(x);
-  setCenterHz(clampView(hz, getSpan()));
-  status('Center: '+fmtHz(getCenterHz()));
-},{passive:true});
-wf.addEventListener('wheel', e=>{
+  
+  // Mouse events
+  wf.addEventListener('mousedown', handleStart, {passive: false});
+  wf.addEventListener('mousemove', handleMove, {passive: true});
+  wf.addEventListener('mouseup', handleEnd, {passive: true});
+  wf.addEventListener('wheel', handleWheel, {passive: false});
+  wf.addEventListener('dblclick', handleDoubleClick, {passive: true});
+  
+  // Touch events für GMod mobile support
+  wf.addEventListener('touchstart', handleStart, {passive: false});
+  wf.addEventListener('touchmove', handleMove, {passive: true});
+  wf.addEventListener('touchend', handleEnd, {passive: true});
+  
+  // Prevent context menu
+  wf.addEventListener('contextmenu', e => e.preventDefault(), {passive: false});
+}
+
+function updateAudio() {
+  if (!state.audioCtx || !state.audioNodes.gate || state.listenHz === null) {
+    return;
+  }
+  
+  // AudioContext resume falls suspended
+  if (state.audioCtx.state === 'suspended') {
+    state.audioCtx.resume();
+  }
+  
+  const pb = getCurrentPassband();
+  if (!pb) return;
+  
+  // Realistische SDR-Audio basierend auf Signalstärke
+  const t = performance.now() / 1000;
+  const pxHz = getSpan() / Math.max(wf.width, 1);
+  
+  // Sample mehrere Punkte im Passband
+  let totalPower = 0;
+  let peakPower = 0;
+  let weightedFreq = 0;
+  const samples = 16;
+  
+  for (let i = 0; i < samples; i++) {
+    const freq = pb.lo + (i / (samples - 1)) * (pb.hi - pb.lo);
+    const power = getSignalPower(freq, t, pxHz);
+    totalPower += power;
+    weightedFreq += power * freq;
+    if (power > peakPower) peakPower = power;
+  }
+  
+  const avgPower = totalPower / samples;
+  const centerOfMass = totalPower > 0 ? weightedFreq / totalPower : pb.center;
+  
+  // AGC - realistischere Verstärkung
+  const agcGain = clamp(Math.sqrt(avgPower) * 1.5, 0.05, 0.8);
+  state.audioNodes.gate.gain.setTargetAtTime(agcGain, state.audioCtx.currentTime, 0.15);
+  
+  // Mode-spezifische Demodulation
+  const mode = MODEP[modeSel.value];
+  let audioFreq = 800;
+  let noiseLevel = 0.08;
+  
+  switch (mode.audio) {
+    case 'cw':
+      // CW: Offset from carrier determines pitch
+      const offset = Math.abs(centerOfMass - state.listenHz);
+      const maxOffset = (pb.hi - pb.lo) / 2;
+      audioFreq = mode.bfo + (offset / maxOffset) * 400;
+      noiseLevel = 0.04 + peakPower * 0.3;
+      break;
+      
+    case 'ssb':
+      // SSB: Schwerpunkt bestimmt Audiofrequenz
+      if (modeSel.value === 'USB') {
+        audioFreq = clamp((centerOfMass - pb.lo) * 0.8, 200, 3000);
+      } else {
+        audioFreq = clamp((pb.hi - centerOfMass) * 0.8, 200, 3000);
+      }
+      noiseLevel = 0.06 + avgPower * 0.4;
+      break;
+      
+    case 'am':
+      // AM: Modulation depth affects noise, carrier pitch varies
+      audioFreq = clamp(600 + (peakPower - avgPower) * 500, 300, 1500);
+      noiseLevel = 0.04 + avgPower * 0.6;
+      break;
+      
+    case 'fm':
+      // FM: Frequenzabweichung -> Audiofrequenz
+      const deviation = (centerOfMass - state.listenHz) / (pb.hi - pb.lo) * 2000;
+      audioFreq = clamp(1000 + deviation + (Math.random() - 0.5) * avgPower * 200, 300, 3000);
+      noiseLevel = 0.03 + avgPower * 0.4;
+      break;
+      
+    default: // IQ
+      audioFreq = clamp(800 + (avgPower - 0.5) * 600, 400, 2000);
+      noiseLevel = 0.05 + avgPower * 0.35;
+      break;
+  }
+  
+  // Audio Updates
+  state.audioNodes.osc.frequency.setTargetAtTime(
+    clamp(audioFreq, 100, 4000), 
+    state.audioCtx.currentTime, 
+    0.08
+  );
+  
+  state.audioNodes.noiseGain.gain.setTargetAtTime(
+    clamp(noiseLevel, 0.01, 0.3), 
+    state.audioCtx.currentTime, 
+    0.12
+  );
+  
+  // Oszillator-Stärke je nach Signal
+  const oscStrength = clamp(peakPower * 0.15, 0.02, 0.2);
+  state.audioNodes.oscGain.gain.setTargetAtTime(
+    oscStrength, 
+    state.audioCtx.currentTime, 
+    0.1
+  );
+}
+
+/* ---------- Resize Observer für GMod ---------- */
+function setupResizeObserver() {
+  let resizeTimeout;
+  
+  function handleResize() {
+    clearTimeout(resizeTimeout);
+    resizeTimeout = setTimeout(() => {
+      layout();
+    }, 100); // Debounce für GMod performance
+  }
+  
+  // Fallback für ältere GMod Chromium versions
+  if (window.ResizeObserver) {
+    try {
+      const observer = new ResizeObserver(handleResize);
+      observer.observe(document.querySelector('.canvas-container'));
+    } catch (e) {
+      window.addEventListener('resize', handleResize, {passive: true});
+    }
+  } else {
+    window.addEventListener('resize', handleResize, {passive: true});
+  }
+  
+  window.addEventListener('orientationchange', handleResize, {passive: true});
+}
+
+/* ---------- Initialization ---------- */
+function init() {
+  try {
+    // Set initial values
+    setFullBand();
+    updateBwLabel();
+    
+    // Setup all event handlers
+    setupControls();
+    setupInteraction();
+    setupResizeObserver();
+    
+    // Initial layout
+    layout();
+    
+    // Start the main loop
+    setStatus('SDR Ready - GMod Optimized');
+    requestAnimationFrame(mainLoop);
+    
+    console.log('Starship COMMS SDR initialized for GMod');
+    
+  } catch (e) {
+    console.error('SDR initialization failed:', e);
+    setStatus('Initialization failed: ' + e.message);
+  }
+}
+
+/* ---------- Error Handling für GMod ---------- */
+window.addEventListener('error', function(e) {
+  console.error('SDR Error:', e.error || e.message);
+  setStatus('Error: ' + (e.message || 'Unknown error'));
+}, {passive: true});
+
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('SDR Promise rejection:', e.reason);
   e.preventDefault();
-  const rect = wf.getBoundingClientRect();
-  const x = clamp((e.clientX - rect.left)/rect.width, 0, 1);
-  const cursorHz = xToHz(x);
-  const factor = Math.pow(1.2, -Math.sign(e.deltaY));
-  applyZoom(factor, cursorHz);
-},{passive:false});
+}, {passive: true});
 
-/* ---------- Render ---------- */
-/* schnelleres Waterfall: Canvas-Scroll via drawImage */
-function drawSpectrum(){
-  const W=spec.width,H=spec.height;
-  sctx.fillStyle='#0f1218'; sctx.fillRect(0,0,W,H);
-  sctx.beginPath();
-  for(let x=0;x<W;x++){
-    const hz = xToHz(x/W);
-    let v = 0.06 + 0.02*(Math.random()-0.5);
-    for(const s of signals){
-      const d = Math.abs(hz-s.f);
-      if(d < s.bw/2) v += 0.6*(1 - d/(s.bw/2));
+/* ---------- GMod Interface (falls verfügbar) ---------- */
+if (window.gmod) {
+  console.log('GMod interface detected');
+  
+  // GMod-spezifische Funktionen können hier hinzugefügt werden
+  window.gmodSDR = {
+    setFrequency: function(hz) {
+      setCenterHz(hz);
+      setStatus('Frequency set via GMod: ' + fmtHz(hz));
+    },
+    
+    getFrequency: function() {
+      return getCenterHz();
+    },
+    
+    setSpan: function(hz) {
+      setSpan(hz);
+      setStatus('Span set via GMod: ' + fmtHz(hz));
+    },
+    
+    getSpan: function() {
+      return getSpan();
+    },
+    
+    tune: function(hz) {
+      state.listenHz = hz;
+      setStatus('Tuned via GMod: ' + fmtHz(hz));
+      updateAudio();
+    },
+    
+    freeze: function(frozen) {
+      state.isFrozen = !!frozen;
+      document.getElementById('freeze').textContent = state.isFrozen ? 'Unfreeze' : 'Freeze';
     }
-    v = clamp(v,0,1);
-    const y = H - (v*H|0);
-    sctx.moveTo(x,H); sctx.lineTo(x,y);
-  }
-  sctx.strokeStyle='#87a3ff'; sctx.stroke();
-
-  sctx.fillStyle='#b8c1e1'; sctx.font='12px ui-monospace';
-  const full = Math.abs(getSpan()-THZ_MAX) < 1;
-  for(let i=0;i<=10;i++){
-    const f = full ? (THZ_MAX*(i/10)) : xToHz(i/10);
-    sctx.fillText(fmtHz(f), (i*(W/10)|0)+4, 14);
-  }
+  };
 }
 
-const lineCache = {w:0, data:null};
-function ensureLine(w){
-  if(lineCache.w!==w){
-    lineCache.w=w;
-    lineCache.data = new ImageData(new Uint8ClampedArray(w*4), w, 1);
-  }
-  return lineCache.data;
-}
-function drawWaterfall(){
-  if(isFrozen) return;
-  const W=wf.width,H=wf.height;
-  if(H>1) wctx.drawImage(wf, 0,0,W,H-1, 0,1,W,H-1);
-
-  const line = ensureLine(W);
-  const data = line.data;
-  for(let x=0;x<W;x++){
-    const hz = xToHz(x/W);
-    let v = 0.06 + 0.02*(Math.random()-0.5);
-    for(const s of signals){
-      const d = Math.abs(hz - s.f);
-      if(d < s.bw/2) v += 0.6*(1 - d/(s.bw/2));
-    }
-    v = clamp(v,0,1);
-    const r = (40 + 200*Math.pow(v,1.1))|0;
-    const g = (20 + 200*Math.pow(v,0.9))|0;
-    const b = (80 + 220*v)|0;
-    const idx = x<<2;
-    data[idx]=r; data[idx+1]=g; data[idx+2]=b; data[idx+3]=255;
-  }
-  wctx.putImageData(line,0,0);
+// Start when DOM is ready
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init, {passive: true});
+} else {
+  // DOM already loaded
+  setTimeout(init, 10);
 }
 
-function loop(){
-  drawSpectrum();
-  drawWaterfall();
-  const fMin = getCenterHz()-getSpan()/2, fMax=getCenterHz()+getSpan()/2;
-  rxInfo.textContent = 'View: '+fmtHz(fMin)+' … '+fmtHz(fMax)+' | Center '+fmtHz(getCenterHz())+' | Span '+fmtHz(getSpan());
-  requestAnimationFrame(loop);
-}
-requestAnimationFrame(loop);
-
-/* ---------- Status ---------- */
-function status(msg){
-  statusEl.textContent=msg;
-  clearTimeout(statusTimer);
-  statusTimer = setTimeout(()=>statusEl.textContent='bereit',2000);
-}
+})(); // End IIFE
 </script>
 </body>
 </html>
