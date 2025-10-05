@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Starship COMMS SDR – 0…10 THz</title>
+<title>Starship COMMS SDR – 0…1000 THz</title>
 <style>
 :root{--bg:#12151b;--fg:#d7e1ff;--muted:#8b95b7;--line:#273043}
 *{box-sizing:border-box;font-family:monospace,Courier,fixed;margin:0;padding:0}
-html,body{height:100%;background:#12151b;color:#d7e1ff;overflow:hidden}
+html,body{height:100%;background:#12151b;color:var(--fg);overflow:hidden}
 body{display:flex;flex-direction:column;min-height:100vh}
 
 .wip-banner{position:relative;height:40px;overflow:hidden;background:#000;z-index:100}
@@ -32,6 +32,7 @@ header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
 .waterfall-container{flex:1}
 canvas{background:#0a0c11;border:1px solid var(--line);border-radius:4px;
  display:block;width:100%;height:100%;image-rendering:pixelated}
+
 aside.panel{border:1px solid var(--line);border-radius:4px;padding:10px;
  background:#0f1218;height:100%;overflow-y:auto}
 input,select,button{background:#0b0e14;border:1px solid var(--line);border-radius:3px;
@@ -41,6 +42,7 @@ input,select,button{background:#0b0e14;border:1px solid var(--line);border-radiu
 .row input,.row select{width:180px;margin-right:4px}
 .row button{margin-right:4px}
 .small{font-size:11px;color:var(--muted)}
+
 footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
  font-size:11px;flex-shrink:0}
 
@@ -55,17 +57,15 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
 <div class="wip-banner">
  <div class="wip-stripes"></div>
  <div class="wip-banner__text">
-  ⚠️ STARSHIP COMMS SDR PROTOTYP 0-10 THz (GMod) ⚠️
+  ⚠️ STARSHIP COMMS SDR PROTOTYP ⚠️
   <button id="audioStart" class="wip-btn">Audio Start</button>
   <button id="audioToggle" class="wip-btn" style="display:none">Audio Pause</button>
  </div>
 </div>
-
 <header>
  <h1>STARSHIP COMMS SDR</h1>
  <span class="small">Wheel=Zoom • Drag=Pan • Click=Listen • DblClick=Center</span>
 </header>
-
 <div class="wrap">
  <div class="layout">
   <div class="maincol">
@@ -74,7 +74,6 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
     <div class="waterfall-container"><canvas id="waterfall"></canvas></div>
    </div>
   </div>
-  
   <div class="sidecol">
    <aside class="panel">
     <div class="row">
@@ -82,801 +81,601 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
      <input id="csvUrl" placeholder="https://.../export?format=csv">
      <button id="csvLoad">Laden</button>
     </div>
-    
     <div class="row">
      <label>Freq:</label>
-     <input id="fCenter" type="number" step="1" min="0" max="10000000000000" value="5000000000000">
+     <input id="fCenter" type="number" step="1" min="0" max="1000000000000000" value="500000000000000">
      <select id="unit">
       <option>Hz</option><option>kHz</option><option selected>MHz</option>
       <option>GHz</option><option>THz</option>
      </select>
     </div>
-    
     <div class="row">
      <label>Span:</label>
-     <input id="span" type="range" min="1000" max="10000000000000" step="1000000" value="10000000000000" style="width:150px">
+     <input id="span" type="range" min="1000" max="1000000000000000" step="1000000" value="1000000000000000" style="width:150px">
      <div class="small" id="spanLbl"></div>
     </div>
-    
     <div class="row">
      <button id="zoomIn">Zoom +</button>
      <button id="zoomOut">Zoom -</button>
      <button id="zoomFull">Full</button>
     </div>
-    
     <div class="row">
      <button id="panL">&lt; Pan</button>
      <button id="panR">Pan &gt;</button>
     </div>
-    
     <div class="row">
      <label>Filter:</label>
      <input id="bw" type="range" min="300" max="500000" step="100" value="2400" style="width:150px">
      <div class="small" id="bwLbl">2.40 kHz (USB)</div>
     </div>
-    
     <div class="row">
      <label>Mode:</label>
      <select id="mode">
       <option>CW</option><option selected>USB</option><option>LSB</option>
-      <option>AM</option><option>FM</option><option>IQ</option>
+      <option>AM</option><option>FM</option><option>PSK</option><option>FSK</option><option>IQ</option>
      </select>
      <button id="freeze">Freeze</button>
      <button id="reset">Reset</button>
     </div>
-    
     <div class="small" id="rxInfo"></div>
     <div class="small" id="status">Ready</div>
    </aside>
   </div>
  </div>
 </div>
-
-<footer><div class="small" id="footerText"></div></footer>
+<footer><div class="small" id="footerText">© Anaxes Naval System – Realistische EM-Signal-Synthese v2.1</div></footer>
 
 <script>
 (function(){'use strict';
-// Konfiguration
-const THZ_MAX=1e13,C_KMS=299792.458,FRAME_BUDGET=16,MAX_CANVAS_SIZE=2048;
-const TYPE_COLOR={zivil:'#ffd666',feindlich:'#ff5a5a',verbündet:'#63e28e','störung':'#c0a060',astronomisch:'#66ccff'};
-const UNIT={Hz:1,kHz:1e3,MHz:1e6,GHz:1e9,THz:1e12};
+// ============================================================================
+// (1) Teilnehmer, Konversationstypen und Konversations-Engine
+// ============================================================================
+const parties = [
+  "OPS@HUB.NET","SUPPLY@CORP.COM","CREW01@SHIP","HQ@FLEET.GOV",
+  "ANNA@HOME.NET","JOHN@MAIL.COM","MAINT@STATION","NODE-17","NODE-18"
+];
 
-// DOM Cache
-const els={};
-['spectrum','waterfall','fCenter','unit','span','spanLbl','bw','bwLbl','mode',
- 'rxInfo','status','audioStart','audioToggle','csvUrl','csvLoad','zoomIn','zoomOut',
- 'zoomFull','panL','panR','freeze','reset','footerText'].forEach(id=>els[id]=document.getElementById(id));
-
-// State
-const state={isFrozen:false,spanVirtual:THZ_MAX,listenHz:null,audioCtx:null,
- audioNodes:{},lastFrameTime:0,frameSkip:0,canvasSize:{w:0,h:0},
- ctx:{spectrum:null,waterfall:null},resolutionScale:1};
-const sched={rows:[],url:'',lastLoaded:0};
-let activeTx=[],signals=null;
-
-// Utils
-const clamp=(v,a,b)=>Math.max(a,Math.min(v,b));
-const rnd=(a,b)=>a+Math.random()*(b-a);
-const fmtHz=f=>{
- const a=Math.abs(f);
- if(a>=1e12)return(f/1e12).toFixed(3)+' THz';
- if(a>=1e9)return(f/1e9).toFixed(3)+' GHz';
- if(a>=1e6)return(f/1e6).toFixed(3)+' MHz';
- if(a>=1e3)return(f/1e3).toFixed(1)+' kHz';
- return f.toFixed(0)+' Hz';
+const conversationTemplates = {
+  logistics: [
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `EMAIL TO: ${conv.to} SUBJECT: REQUEST ${100+Math.floor(Math.random()*200)} CRATES FOOD ETA ASAP`
+    }),
+    (conv) => ({
+      from: conv.to, to: conv.from,
+      content: `REPLY FROM: ${conv.to} SUBJECT: CONFIRMED ETA ${["14:00 UTC","16:30 UTC","ASAP"][Math.floor(Math.random()*3)]}`
+    }),
+    (conv) => ({
+      from: conv.from, to: "OPS@HUB.NET",
+      content: `EMAIL TO: OPS@HUB.NET SUBJECT: UPDATE DELIVERY +${(1+Math.floor(Math.random()*2)).toString().padStart(2,"0")}:${(10+Math.floor(Math.random()*40)).toString().padStart(2,"0")} DELAY`
+    }),
+    (conv) => ({
+      from: "OPS@HUB.NET", to: conv.from,
+      content: `REPLY FROM: OPS@HUB.NET SUBJECT: RECEIVED STOP`
+    })
+  ],
+  personal: [
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `HELLO ${conv.to.split("@")[0]} STOP ARRIVING STATION ${10+Math.floor(Math.random()*10)} AT ${17+Math.floor(Math.random()*3)}:${(10+Math.floor(Math.random()*50)).toString().padStart(2,"0")}`
+    }),
+    (conv) => ({
+      from: conv.to, to: conv.from,
+      content: `REPLY ${conv.from.split("@")[0]} STOP SEE YOU AT DOCK ${1+Math.floor(Math.random()*4)}`
+    }),
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `${conv.from.split("@")[0]} STOP BRINGING PACKAGE STOP`
+    })
+  ],
+  system: [
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `SYSLOG: NODE-17 ONLINE VERSION 2.5.${Math.floor(Math.random()*10)}`
+    }),
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `SYSLOG: NODE-17 CHECKSUM OK`
+    }),
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `SYSLOG: NODE-18 WARNING TEMP HIGH ${75+Math.floor(Math.random()*10)}C`
+    }),
+    (conv) => ({
+      from: conv.from, to: conv.to,
+      content: `SYSLOG: NODE-18 NORMALIZED TEMP ${55+Math.floor(Math.random()*10)}C`
+    })
+  ]
 };
-const byUnit=(v,u)=>(UNIT[u]||1)*v;
-const doppler=(f0,v)=>f0*(1+v/C_KMS);
 
-// Parse helpers for schedule
-function parseFrequency(str){
- if(typeof str==='number')return str;
- if(!str)return 0;
- const s=String(str).trim();
- const m=/^\s*([+-]?(?:\d+\.?\d*|\d*\.\d+))(\s*(THz|GHz|MHz|kHz|Hz))?\s*$/i.exec(s);
- if(!m)return parseFloat(s)||0;
- const val=parseFloat(m[1]);
- const unit=(m[3]||'Hz');
- const mul=UNIT[unit]||1;
- return val*mul;
+function pickRandom(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+
+function newConversation(){
+  const types = ["logistics","personal","system"];
+  const type = pickRandom(types);
+  let from, to;
+  if(type==="logistics"){
+    from = pickRandom(["OPS@HUB.NET","CREW01@SHIP","HQ@FLEET.GOV"]);
+    to = pickRandom(["SUPPLY@CORP.COM","OPS@HUB.NET"]);
+    if(from===to) to = "SUPPLY@CORP.COM";
+  } else if(type==="personal"){
+    from = pickRandom(["ANNA@HOME.NET","JOHN@MAIL.COM"]);
+    to = from==="ANNA@HOME.NET" ? "JOHN@MAIL.COM" : "ANNA@HOME.NET";
+  } else if(type==="system"){
+    from = pickRandom(["NODE-17","NODE-18","MAINT@STATION"]);
+    to = "";
+  }
+  return {
+    type,
+    step: 0,
+    max: conversationTemplates[type].length,
+    from,
+    to,
+    history: []
+  };
 }
 
-function parseTimeToMs(s){
- if(!s)return NaN;
- if(typeof s==='number')return s;
- const t=Date.parse(s);
- return isNaN(t)?NaN:t;
+function advanceConversation(conv){
+  conv.step++;
+  if(conv.step > conv.max) return null;
+  const tpl = conversationTemplates[conv.type][conv.step-1];
+  if(!tpl) return null;
+  const msg = tpl(conv);
+  // Für Systemmeldungen Wiederholung erlauben, sonst keine Duplikate
+  if(conv.type!=="system" && conv.history.includes(msg.content)) return null;
+  conv.history.push(msg.content);
+  return msg;
 }
 
+// ============================================================================
+// (2) Signal-Generator-Klassen (aus deinem Original übernommen)
+// ============================================================================
+class EMSignalGenerator {
+  constructor(audioCtx,freq,mode){
+    this.ctx=audioCtx; this.freq=freq; this.mode=mode;
+    this.osc=null; this.gain=null; this.started=false;
+  }
+  start(){
+    if(this.started) return;
+    this.started=true;
+    this.osc=this.ctx.createOscillator();
+    this.gain=this.ctx.createGain();
+    this.gain.gain.value=0;
+    this.osc.connect(this.gain).connect(this.ctx.destination);
+
+    switch(this.mode){
+      case "CW": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
+      case "USB": case "LSB": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
+      case "AM": this.osc.type="square"; this.osc.frequency.value=this.freq; break;
+      case "FM": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
+      case "PSK": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
+      case "FSK": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
+      default: this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
+    }
+    this.osc.start();
+  }
+  stop(){
+    if(!this.started) return;
+    try{ this.osc.stop(); }catch{}
+    this.started=false;
+  }
+  setGain(v){
+    if(this.gain) this.gain.gain.setValueAtTime(v,this.ctx.currentTime);
+  }
+}
+
+// ============================================================================
+// (3) Morse-CW Map für Text→Morse
+// ============================================================================
+const MORSE = {
+  "A":".-","B":"-...","C":"-.-.","D":"-..","E":".","F":"..-.","G":"--.","H":"....","I":"..","J":".---","K":"-.-","L":".-..",
+  "M":"--","N":"-.","O":"---","P":".--.","Q":"--.-","R":".-.","S":"...","T":"-","U":"..-","V":"...-","W":".--","X":"-..-",
+  "Y":"-.--","Z":"--..","0":"-----","1":".----","2":"..---","3":"...--","4":"....-","5":".....","6":"-....","7":"--...","8":"---..","9":"----.",
+  ".":".-.-.-",",":"--..--","?":"..--..","/":"-..-.","=":"-...-","-":"-....-","(":"-.--.",")":"-.--.-","+":".-.-.",":":"---...","'":".----.",
+  "Ä":".-.-","Ö":"---.","Ü":"..--","Ñ":"--.--","CH":"----"," ":" "
+};
+function textToMorse(text){
+  const up = text.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let out = [], i=0;
+  while(i<up.length){
+    if (i+1<up.length && up[i]==='C' && up[i+1]==='H' && MORSE["CH"]) {
+      out.push(MORSE["CH"]); i+=2; continue;
+    }
+    const ch = up[i]; out.push(MORSE[ch] ?? ''); i++;
+  }
+  return out.join(' ');
+}
+
+// ============================================================================
+// (4) Audio-Setup + Steuerung
+// ============================================================================
+let audioCtx=null;
+function initAudio(){
+  if(audioCtx) return audioCtx;
+  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+  return audioCtx;
+}
+
+let activeGenerators=[];
+function playSignal(tx){
+  const ctx=initAudio();
+  const g=new EMSignalGenerator(ctx,tx.f,tx.mode);
+  g.start(); g.setGain(tx.amp||0.2);
+  activeGenerators.push(g);
+
+  // falls CW: Text→Morse keying
+  if(tx.mode==="CW" && tx.content){
+    const morse=textToMorse(tx.content);
+    const unit=1.2/20; // 20wpm default
+    let t=ctx.currentTime;
+    for(const s of morse){
+      if(s==="."){ g.gain.gain.setValueAtTime(tx.amp,t); t+=unit; g.gain.gain.setValueAtTime(0,t); t+=unit; }
+      else if(s==="-"){ g.gain.gain.setValueAtTime(tx.amp,t); t+=3*unit; g.gain.gain.setValueAtTime(0,t); t+=unit; }
+      else if(s===" "){ t+=7*unit; }
+    }
+  }
+  setTimeout(()=>{ g.stop(); activeGenerators=activeGenerators.filter(x=>x!==g); },
+              tx.endMs-Date.now());
+}
+// ============================================================================
+// (5) CSV-Parser für externe Schedules
+// ============================================================================
 function parseCsvSchedule(text){
- const lines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
- if(lines.length===0)return [];
- const header=lines[0].split(',').map(h=>h.trim().toLowerCase());
- const idx=(...names)=>{
-  for(const n of names){
-   const i=header.indexOf(n.toLowerCase());
-   if(i>=0)return i;
+  const lines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(lines.length===0) return [];
+  const header=lines[0].split(',').map(h=>h.trim().toLowerCase());
+  const idxF=header.indexOf("freq_hz");
+  const idxMode=header.indexOf("mode");
+  const idxContent=header.indexOf("text");
+  const idxDur=header.indexOf("duration");
+  const rows=[];
+  for(let i=1;i<lines.length;i++){
+    const cols=lines[i].split(',');
+    const f=parseFloat(cols[idxF])||1000;
+    const mode=(cols[idxMode]||"CW").toUpperCase();
+    const content=cols[idxContent]||"TEST";
+    const dur=parseInt(cols[idxDur]||"5000");
+    rows.push({
+      name:"CSV",
+      f,
+      bw:mode==="CW"?500:2500,
+      mode,
+      type:"zivil",
+      content,
+      amp:0.4,
+      startMs:Date.now(),
+      endMs:Date.now()+dur
+    });
   }
-  return -1;
- };
- const iName=idx('name','callsign','label');
- const iF=idx('f','freq','frequency','hz');
- const iBW=idx('bw','bandwidth');
- const iMode=idx('mode');
- const iType=idx('type','category');
- const iStart=idx('start','start_ms','begin');
- const iEnd=idx('end','end_ms','stop');
- const iAmp=idx('amp','amplitude','strength');
- const rows=[];
- for(let li=1;li<lines.length;li++){
-  const cols=lines[li].split(',');
-  const name=(iName>=0?cols[iName]:'TX').trim();
-  const fHz=parseFrequency(iF>=0?cols[iF]:0);
-  if(!isFinite(fHz)||fHz<=0)continue;
-  const bwHz=parseFrequency(iBW>=0?cols[iBW]:2400);
-  const mode=((iMode>=0?cols[iMode]:'USB')||'USB').trim().toUpperCase();
-  const type=((iType>=0?cols[iType]:'zivil')||'zivil').trim();
-  const startMs=parseTimeToMs(iStart>=0?cols[iStart]:''),endMs=parseTimeToMs(iEnd>=0?cols[iEnd]:'');
-  const amp=parseFloat(iAmp>=0?cols[iAmp]:0.5);
-  rows.push({name,fHz,bwHz,mode,type,startMs,endMs,amp:isFinite(amp)?amp:0.5});
- }
- return rows;
+  return rows;
 }
-
 async function loadCsvSchedule(url){
- try{
-  if(!url)throw new Error('Keine URL');
-  const res=await fetch(url,{cache:'no-store'});
-  if(!res.ok)throw new Error('HTTP '+res.status);
-  const text=await res.text();
-  sched.rows=parseCsvSchedule(text);
-  sched.url=url;sched.lastLoaded=Date.now();
-  setStatus('CSV geladen: '+sched.rows.length+' Einträge');
- }catch(e){
-  setStatus('CSV Fehler: '+e.message);
- }
-}
-
-function updateActiveSchedule(nowMs){
- const now=isFinite(nowMs)?nowMs:Date.now();
- const next=[];
- for(const r of sched.rows){
-  const okStart=isNaN(r.startMs)||now>=r.startMs;
-  const okEnd=isNaN(r.endMs)||now<=r.endMs;
-  if(okStart&&okEnd){
-   next.push({
-    name:r.name||'TX',
-    f:r.fHz,
-    bw:Math.max(200, r.bwHz||2400),
-    mode:(r.mode||'USB').toUpperCase(),
-    type:r.type||'zivil',
-    amp:clamp(isFinite(r.amp)?r.amp:0.5,0.05,1)
-   });
-  }
- }
- activeTx=next;
-}
-
-// Signal Generation
-function generateSignals(){
- const s={astroLines:[],spurs:[],pulsars:[]};
- const base=[['H I',1.420405751e9],['OH 1612',1.612231e9],['OH 1665',1.6654018e9],
-  ['CO(1-0)',115.2712018e9],['[C II]',1.900539e12]];
- base.forEach(([name,f0])=>{
-  const v=rnd(-200,200),f=doppler(f0,v),bw=Math.max(500,f*(rnd(5,50)/C_KMS));
-  s.astroLines.push({name,f,bw,amp:rnd(.4,.7)});
- });
- for(let i=0;i<8;i++)s.spurs.push({f:Math.random()*THZ_MAX,bw:rnd(200,8000),amp:rnd(.15,.35)});
- const t0=performance.now()/1000;
- for(let i=0;i<2;i++){
-  const fmin=rnd(50e6,800e6);
-  s.pulsars.push({fmin,fmax:fmin+rnd(50e6,300e6),period:rnd(.3,1.2),
-   duty:rnd(.05,.08),amp:rnd(.4,.6),t0:t0+rnd(0,3)});
- }
- return s;
-}
-
-// Frequenz Management
-function setCenterHz(f){
- const u=els.unit.value;
- els.fCenter.value=(f/byUnit(1,u)).toFixed(3);
-}
-function getCenterHz(){return byUnit(parseFloat(els.fCenter.value)||0,els.unit.value);}
-function getSpan(){return state.spanVirtual;}
-function setSpan(v){
- state.spanVirtual=clamp(v,1e3,THZ_MAX);
- els.span.value=Math.min(state.spanVirtual,1e13);
- els.spanLbl.textContent=fmtHz(state.spanVirtual);
-}
-function xToHz(x){const fc=getCenterHz(),sp=getSpan();return fc+(x-.5)*sp;}
-function hzToX(hz){const fc=getCenterHz(),sp=getSpan();return((hz-fc)/sp)+.5;}
-function clampView(fc,sp){
- let fMin=fc-sp/2,fMax=fc+sp/2;
- if(fMin<0)fc+=-fMin;
- if(fMax>THZ_MAX)fc-=(fMax-THZ_MAX);
- return fc;
-}
-
-// Canvas Management
-function resizeCanvas(canvas,container){
- const r=container.getBoundingClientRect();
- const scale=state.resolutionScale||1;
- const w=Math.min(MAX_CANVAS_SIZE,Math.max(32,Math.floor(r.width*scale)));
- const h=Math.min(MAX_CANVAS_SIZE,Math.max(32,Math.floor(r.height*scale)));
- if(canvas.width!==w||canvas.height!==h){
-  canvas.width=w;canvas.height=h;
-  canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';
-  return true;
- }
- return false;
-}
-function layout(){
- const specResized=resizeCanvas(els.spectrum,document.querySelector('.spectrum-container'));
- const wfResized=resizeCanvas(els.waterfall,document.querySelector('.waterfall-container'));
- if(specResized||wfResized)state.canvasSize={w:els.spectrum.width,h:els.spectrum.height};
-}
-
-// Rendering
-const renderData={spectrumData:null,waterfallLine:null};
-const signalCache={lastHz:-1,lastT:-1,cachedValue:0};
-
-function getSignalPower(hz,t,pxHz){
- const key=(hz/1000|0)*1000;
- if(signalCache.lastHz===key&&Math.abs(signalCache.lastT-t)<.1)
-  return signalCache.cachedValue+(Math.random()-.5)*.02;
- 
- let power=0.03+(Math.random()-.5)*.015;
- 
- signals.astroLines.forEach(s=>{
-  const half=Math.max(s.bw*.5,pxHz*.5),d=Math.abs(hz-s.f);
-  if(d<half)power+=s.amp*(1-d/half);
- });
- 
- signals.spurs.forEach(s=>{
-  const half=Math.max(s.bw*.5,pxHz),d=Math.abs(hz-s.f);
-  if(d<half)power+=s.amp*(1-d/half);
- });
- 
- signals.pulsars.forEach(p=>{
-  if(hz>=p.fmin&&hz<=p.fmax){
-   const ph=((t-p.t0)%p.period+p.period)%p.period;
-   if(ph<p.period*p.duty)power+=p.amp*.8;
-  }
- });
- 
- activeTx.forEach(tx=>{
-  const fc=tx.f,half=Math.max(tx.bw*.5,pxHz);
-  switch(tx.mode){
-   case'AM':{
-    const d=Math.abs(hz-fc);
-    if(d<half)power+=tx.amp*(1-d/half);
-    const carr=Math.abs(hz-fc),cHalf=Math.max(pxHz*.5,50);
-    if(carr<cHalf)power+=0.2*tx.amp*(1-carr/cHalf);
-    break;
-   }
-   case'USB':case'SSTV':{
-    const lo=fc,hi=fc+tx.bw;
-    if(hz>=lo&&hz<=hi){
-     const w=Math.max(tx.bw,pxHz*2);
-     power+=tx.amp*clamp(1-(hz-lo)/w,.2,1);
-    }
-    break;
-   }
-   case'LSB':{
-    const lo=fc-tx.bw,hi=fc;
-    if(hz>=lo&&hz<=hi){
-     const w=Math.max(tx.bw,pxHz*2);
-     power+=tx.amp*clamp(1-(hi-hz)/w,.2,1);
-    }
-    break;
-   }
-   case'FM':{
-    const d=Math.abs(hz-fc);
-    if(d<half){
-     const x=d/half,ripple=.12*Math.cos(8*Math.PI*x);
-     power+=tx.amp*(0.65+0.35*(1-x)+ripple);
-    }
-    break;
-   }
-   case'CW':{
-    const cwHalf=Math.max(half*.25,80),d=Math.abs(hz-fc);
-    if(d<cwHalf){
-     const x=d/cwHalf;
-     power+=tx.amp*Math.exp(-3*x*x);
-    }
-    break;
-   }
-   default:{
-    const d=Math.abs(hz-fc);
-    if(d<half)power+=tx.amp*(1-d/half);
-   }
-  }
- });
- 
- signalCache.lastHz=key;
- signalCache.lastT=t;
- signalCache.cachedValue=power;
- return Math.max(0,power);
-}
-
-function drawSpectrum(){
- const W=els.spectrum.width,H=els.spectrum.height;
- if(W<1||H<1)return;
- 
- if(!renderData.spectrumData||renderData.spectrumData.length!==W){
-  renderData.spectrumData=new Float32Array(W);
- }
- 
- const t=performance.now()/1000,pxHz=getSpan()/W,data=renderData.spectrumData;
- let vmax=.1;
- 
- for(let x=0;x<W;x++){
-  const hz=xToHz(x/W),v=getSignalPower(hz,t,pxHz);
-  data[x]=v;
-  if(v>vmax)vmax=v;
- }
- 
- const ctx=state.ctx.spectrum;
- ctx.fillStyle='#0f1218';
- ctx.fillRect(0,0,W,H);
- 
- if(vmax>0){
-  ctx.strokeStyle='#87a3ff';
-  ctx.beginPath();
-  const g=1/vmax;
-  for(let x=0;x<W;x++){
-   const y=H-(clamp(data[x]*g,0,1)*H);
-   if(x===0)ctx.moveTo(x,y);
-   else ctx.lineTo(x,y);
-  }
-  ctx.stroke();
- }
- 
- ctx.fillStyle='#b8c1e1';
- ctx.font='10px monospace';
- const n=5;
- for(let i=0;i<=n;i++){
-  const f=xToHz(i/n);
-  ctx.fillText(fmtHz(f),i*W/n+2,12);
- }
- 
- drawOverlays(ctx,W,H,pxHz);
-}
-
-function drawWaterfall(){
- if(state.isFrozen)return;
- const W=els.waterfall.width,H=els.waterfall.height;
- if(W<1||H<1)return;
- 
- const ctx=state.ctx.waterfall;
- if(H>1){
-  ctx.drawImage(els.waterfall,0,0,W,H-1,0,1,W,H-1);
- }
- 
- if(!renderData.waterfallLine||renderData.waterfallLine.width!==W){
-  renderData.waterfallLine=ctx.createImageData(W,1);
- }
- 
- const t=performance.now()/1000,pxHz=getSpan()/W,px=renderData.waterfallLine.data;
- let vmax=.1;
- 
- for(let x=0;x<W;x++){
-  const hz=xToHz(x/W),v=getSignalPower(hz,t,pxHz);
-  if(v>vmax)vmax=v;
-  const q=clamp(v/vmax,0,1);
-  const r=(40+200*Math.pow(q,1.2))|0;
-  const g=(20+180*q)|0;
-  const b=(80+175*q)|0;
-  const i=x<<2;
-  px[i]=r;px[i+1]=g;px[i+2]=b;px[i+3]=255;
- }
- 
- ctx.putImageData(renderData.waterfallLine,0,0);
- // Do not draw overlays on the waterfall canvas to avoid trailing artifacts
-}
-
-function drawOverlays(ctx,W,H,pxHz){
- const fc=getCenterHz(),sp=getSpan(),fmin=fc-sp/2;
- ctx.save();
- 
- // Astronomische Linien
- ctx.fillStyle='#ffc94d';
- signals.astroLines.forEach(s=>{
-  if(s.f>=fmin&&s.f<=fmin+sp){
-   const x=((s.f-fmin)/sp)*W;
-   ctx.fillRect(x,0,Math.max(1,pxHz/sp*W*2),4);
-  }
- });
- 
- // Aktive Transmitter
- activeTx.forEach(tx=>{
-  const col=TYPE_COLOR[tx.type]||'#8aa';
-  let xL,xR;
-  
-  switch(tx.mode){
-   case'USB':case'SSTV':
-    xL=((tx.f-fmin)/sp)*W;
-    xR=((tx.f+tx.bw-fmin)/sp)*W;
-    break;
-   case'LSB':
-    xL=((tx.f-tx.bw-fmin)/sp)*W;
-    xR=((tx.f-fmin)/sp)*W;
-    break;
-   default:
-    xL=((tx.f-tx.bw/2-fmin)/sp)*W;
-    xR=((tx.f+tx.bw/2-fmin)/sp)*W;
-  }
-  
-  const w=Math.max(2,xR-xL);
-  ctx.fillStyle=col+'24';
-  ctx.fillRect(Math.max(0,xL),0,w,H);
-  ctx.strokeStyle=col+'8c';
-  ctx.beginPath();
-  ctx.moveTo(xL,0);ctx.lineTo(xL,H);
-  ctx.moveTo(xR,0);ctx.lineTo(xR,H);
-  ctx.stroke();
-  ctx.fillStyle='rgba(255,255,255,.85)';
-  ctx.font='700 10px monospace';
-  ctx.fillText(`${tx.name} [${tx.mode}]`,Math.max(2,xL+2),12);
- });
- 
- // Passband Anzeige
- if(state.listenHz!==null){
-  const pb=getCurrentPassband();
-  if(pb){
-   const xL=((pb.lo-fmin)/sp)*W,xH=((pb.hi-fmin)/sp)*W;
-   const mode=els.mode.value;
-   const isUSB=mode==='USB',isLSB=mode==='LSB';
-   ctx.fillStyle=isUSB?'rgba(0,255,160,.15)':isLSB?'rgba(255,120,0,.15)':'rgba(0,200,255,.15)';
-   ctx.fillRect(Math.max(0,xL),0,Math.max(1,xH-xL),H);
-   ctx.strokeStyle=isUSB?'rgba(0,255,160,.6)':isLSB?'rgba(255,120,0,.6)':'rgba(0,200,255,.6)';
-   ctx.lineWidth=2;
-   ctx.beginPath();
-   ctx.moveTo(xL,0);ctx.lineTo(xL,H);
-   ctx.moveTo(xH,0);ctx.lineTo(xH,H);
-   ctx.stroke();
-  }
- }
- 
- ctx.restore();
-}
-
-function getCurrentPassband(){
- if(state.listenHz===null)return null;
- const bw=getEffectiveBandwidth(),m=els.mode.value;
- if(m==='USB')return{lo:state.listenHz,hi:state.listenHz+bw,center:state.listenHz};
- if(m==='LSB')return{lo:state.listenHz-bw,hi:state.listenHz,center:state.listenHz};
- return{lo:state.listenHz-bw/2,hi:state.listenHz+bw/2,center:state.listenHz};
-}
-
-function getEffectiveBandwidth(){
- const base=parseFloat(els.bw.value)||2400,m=els.mode.value;
- const MODES={CW:{scale:.4,min:200,max:1200},USB:{scale:1,min:1200,max:3200},
-  LSB:{scale:1,min:1200,max:3200},AM:{scale:2,min:3000,max:10000},
-  FM:{scale:6,min:8000,max:180000},IQ:{scale:1,min:1000,max:50000}};
- const mode=MODES[m]||MODES.USB;
- return clamp(base*mode.scale,mode.min,mode.max);
-}
-
-// Audio synthesis (approximate demod)
-function createNoiseBuffer(ctx,lenSec=2){
- const sr=ctx.sampleRate,frames=Math.max(1,Math.floor(lenSec*sr));
- const buffer=ctx.createBuffer(1,frames,sr);
- const data=buffer.getChannelData(0);
- for(let i=0;i<frames;i++)data[i]=(Math.random()*2-1)*0.6;
- return buffer;
-}
-
-function ensureAudioGraph(){
- if(!state.audioCtx)return;
- if(state.audioNodes.masterGain)return;
- const ctx=state.audioCtx;
- const master=ctx.createGain();
- master.gain.value=0.0;
- master.connect(ctx.destination);
- const hp=ctx.createBiquadFilter();
- hp.type='highpass';hp.frequency.value=90;hp.Q.value=0.707;
- const lp=ctx.createBiquadFilter();
- lp.type='lowpass';lp.frequency.value=3000;lp.Q.value=0.707;
- hp.connect(lp);lp.connect(master);
- const noise=ctx.createBufferSource();
- noise.buffer=createNoiseBuffer(ctx,2);
- noise.loop=true;
- const noiseGain=ctx.createGain();
- noiseGain.gain.value=0.0;
- noise.connect(noiseGain);noiseGain.connect(hp);
- noise.start();
- const cwOsc=ctx.createOscillator();
- cwOsc.type='sine';
- cwOsc.frequency.value=600;
- const cwGain=ctx.createGain();
- cwGain.gain.value=0.0;
- cwOsc.connect(cwGain);cwGain.connect(hp);
- cwOsc.start();
- state.audioNodes={masterGain:master,noiseGain:noiseGain,cwGain:cwGain,filterHP:hp,filterLP:lp,noiseSource:noise,cwOsc:cwOsc};
-}
-
-function setTargetGain(gainNode,valueMs,value){
- const now=state.audioCtx.currentTime;
- const v=clamp(value,0,1);
- try{
-  gainNode.gain.cancelScheduledValues(now);
-  gainNode.gain.linearRampToValueAtTime(v, now + Math.max(0.01,valueMs/1000));
- }catch(_){ gainNode.gain.value=v; }
-}
-
-function updateAudioMix(){
- if(!state.audioCtx||!state.audioNodes.masterGain)return;
- const pb=getCurrentPassband();
- const nodes=state.audioNodes;
- const running=state.audioCtx.state==='running';
- if(!running){ setTargetGain(nodes.masterGain,50,0); return; }
- if(!pb){
-  setTargetGain(nodes.noiseGain,80,0);
-  setTargetGain(nodes.cwGain,80,0);
-  setTargetGain(nodes.masterGain,50,0);
-  return;
- }
- // Map passband width to audio lowpass cutoff and overall gain
- const bw=pb.hi-pb.lo;
- const mode=els.mode.value;
- const cutoff=Math.min(12000, Math.max(300, bw));
- nodes.filterLP.frequency.setTargetAtTime(cutoff, state.audioCtx.currentTime, 0.05);
- // Sample power inside passband to drive level
- const W=Math.max(64, els.spectrum.width|0);
- const pxHz=getSpan()/W;
- const t=performance.now()/1000;
- let sum=0,samples=12;
- for(let i=0;i<samples;i++){
-  const f=pb.lo + (i+0.5)*(bw/samples);
-  sum+=getSignalPower(f,t,pxHz);
- }
- const p=sum/samples; // ~0..1
- const baseLevel=clamp(p*1.2,0,1);
- const isCW=mode==='CW';
- const masterLevel=isCW?Math.min(0.7, baseLevel*0.8):Math.min(0.9, baseLevel);
- setTargetGain(nodes.masterGain,30, masterLevel>0?0.6:0.0);
- if(isCW){
-  nodes.cwOsc.frequency.setTargetAtTime(600, state.audioCtx.currentTime, 0.02);
-  setTargetGain(nodes.cwGain,25, baseLevel);
-  setTargetGain(nodes.noiseGain,25, 0);
- }else{
-  setTargetGain(nodes.cwGain,25, 0);
-  // For voice/data modes, expose noise shaped by LP cutoff. Scale by bandwidth to avoid loud wide-FM
-  const bwNorm=clamp((bw/3000),0.2,3);
-  setTargetGain(nodes.noiseGain,25, clamp(baseLevel*0.6/bwNorm,0,0.8));
- }
-}
-
-// Hauptloop
-let lastSched=0;
-function mainLoop(){
- const now=performance.now();
- if(document.hidden){
-  // throttle hard when not visible to save CPU in Chromium/WebKit
-  setTimeout(mainLoop,250);
-  return;
- }
- if(now-state.lastFrameTime<FRAME_BUDGET){
-  state.frameSkip++;
-  if(state.frameSkip<2){
-   requestAnimationFrame(mainLoop);
-   return;
-  }
- }
- state.frameSkip=0;
- state.lastFrameTime=now;
- 
- if(now-lastSched>1000){
-  updateActiveSchedule(Date.now());
-  lastSched=now;
- }
- 
- try{
-  drawSpectrum();
-  drawWaterfall();
-  updateInfo();
-  updateAudioMix();
- }catch(e){console.error(e);}
-
- // simple adaptive resolution: if we're missing budget often, scale down; if smooth, scale up
- if(state.lastFrameTime && performance.now()-now>FRAME_BUDGET*1.2){
-  state.resolutionScale=Math.max(0.5,state.resolutionScale*0.95);
-  layout();
- }else if(state.frameSkip===0){
-  state.resolutionScale=Math.min(1,Math.fround(state.resolutionScale*1.01));
- }
- 
- requestAnimationFrame(mainLoop);
-}
-
-function updateInfo(){
- const fc=getCenterHz(),sp=getSpan(),fMin=fc-sp/2,fMax=fc+sp/2;
- els.rxInfo.textContent=`View: ${fmtHz(fMin)} … ${fmtHz(fMax)} | Center: ${fmtHz(fc)} | TX: ${activeTx.length}`;
-}
-
-// Steuerung
-function setupControls(){
- els.zoomIn.onclick=()=>applyZoom(1.5);
- els.zoomOut.onclick=()=>applyZoom(1/1.5);
- els.zoomFull.onclick=()=>setFullBand();
- els.panL.onclick=()=>panBy(-.2);
- els.panR.onclick=()=>panBy(.2);
- els.freeze.onclick=()=>{
-  state.isFrozen=!state.isFrozen;
-  els.freeze.textContent=state.isFrozen?'Unfreeze':'Freeze';
- };
- els.reset.onclick=()=>{
-  setFullBand();
-  state.listenHz=null;
-  setStatus('Reset');
- };
- els.csvLoad.onclick=()=>{
-  const url=(els.csvUrl.value||'').trim();
-  if(!url){setStatus('CSV URL fehlt');return;}
-  loadCsvSchedule(url);
- };
- els.span.oninput=()=>setSpan(parseFloat(els.span.value));
- els.unit.onchange=()=>setCenterHz(getCenterHz());
- els.bw.oninput=updateBwLabel;
- els.mode.onchange=()=>{updateBwLabel();};
- els.bw.onchange=()=>{updateBwLabel();};
- 
- els.audioStart.onclick=async()=>{
   try{
-   if(!state.audioCtx){
-    const Ctx=window.AudioContext||window.webkitAudioContext;
-    if(!Ctx)throw new Error('Web Audio nicht unterstützt');
-    state.audioCtx=new Ctx();
-   }
-   if(state.audioCtx.state==='suspended')await state.audioCtx.resume();
-   ensureAudioGraph();
-   setTargetGain(state.audioNodes.masterGain,60,0.6);
-   els.audioStart.style.display='none';
-   els.audioToggle.style.display='';
-   setStatus('Audio bereit');
-  }catch(e){setStatus('Audio Fehler: '+e.message);}
- };
- 
- els.audioToggle.onclick=()=>{
-  if(!state.audioCtx)return;
-  if(state.audioCtx.state==='running'){
-   state.audioCtx.suspend();
-   els.audioToggle.textContent='Audio Resume';
-  }else{
-   state.audioCtx.resume();
-   ensureAudioGraph();
-   els.audioToggle.textContent='Audio Pause';
+    const res=await fetch(url,{cache:"no-store"});
+    const text=await res.text();
+    return parseCsvSchedule(text);
+  }catch(e){ console.error("CSV Fehler",e); return []; }
+}
+
+// ============================================================================
+// (6) ActiveTx Verwaltung
+// ============================================================================
+let activeTx=[];
+function updateActiveTx(){
+  const now=Date.now();
+  // Entferne abgelaufene, aber lasse Testsignale immer drin
+  activeTx = activeTx.filter(tx => tx.permanent || now < tx.endMs);
+}
+
+// ============================================================================
+// (7) Main Loop + Konversations-Engine
+// ============================================================================
+let currentConv = null;
+let nextMsgTime = Date.now()+5000;
+
+function generateCivilianTraffic(){
+  // Frequenz und Mode plausibel wählen, immer im sichtbaren Bereich!
+  const modes = ["CW","PSK","FSK"];
+  const mode = pickRandom(modes);
+  const now = Date.now();
+  const dur = (12000+Math.random()*18000); // 12–30s
+  // Frequenz im sichtbaren Bereich (±35% vom Center)
+  const fc = getCenterHz();
+  const span = getSpan();
+  const freq = fc + (Math.random()-0.5)*span*0.7;
+  return {
+    name:"CIVIL",
+    f:Math.max(300,freq),
+    bw: mode==="CW" ? 500 : 2500,
+    mode,
+    type:"zivil",
+    content:"",
+    amp:0.5+Math.random()*0.3, // etwas lauter für Sichtbarkeit
+    startMs: now,
+    endMs: now+dur
+  };
+}
+
+function mainLoop(){
+  const now = Date.now();
+  updateActiveTx();
+
+  // Konversationsbasierter Datenverkehr
+  if(now > nextMsgTime){
+    if(!currentConv || currentConv.step >= currentConv.max){
+      currentConv = newConversation();
+    }
+    const msg = advanceConversation(currentConv);
+    if(msg){
+      const tx = generateCivilianTraffic();
+      tx.content = msg.content;
+      tx.name = currentConv.type.toUpperCase();
+      playSignal(tx);
+      activeTx.push(tx);
+      document.getElementById("status").textContent="Traffic: "+msg.content;
+    }
+    nextMsgTime = now + (5000 + Math.random()*10000);
   }
- };
+
+  requestAnimationFrame(mainLoop);
 }
 
-function applyZoom(f,anchorHz=null){
- const sp=getSpan(),nsp=clamp(sp/f,1e3,THZ_MAX),x=anchorHz?hzToX(anchorHz):.5;
- setSpan(nsp);
- const fc=clampView(anchorHz?(anchorHz-(x-.5)*nsp):getCenterHz(),nsp);
- setCenterHz(fc);
-}
-
-function panBy(frac){
- const shift=frac*getSpan();
- setCenterHz(clampView(getCenterHz()+shift,getSpan()));
-}
-
-function setFullBand(){
- setSpan(THZ_MAX);
- setCenterHz(THZ_MAX/2);
-}
-
-function updateBwLabel(){
- const eff=getEffectiveBandwidth(),m=els.mode.value;
- const lbl=eff>=1e6?(eff/1e6).toFixed(2)+' MHz':(eff/1e3).toFixed(2)+' kHz';
- els.bwLbl.textContent=lbl+' ('+m+')';
-}
-
-function setStatus(msg){
- els.status.textContent=msg;
- setTimeout(()=>els.status.textContent='Ready',2000);
-}
-
-// Interaktion
-function setupInteraction(){
- let isDown=false,startX=0,startFc=0,moved=0;
- 
- const getX=e=>e.clientX||(e.touches&&e.touches[0]&&e.touches[0].clientX)||0;
- 
- function start(e){
-  e.preventDefault();
-  isDown=true;
-  startX=getX(e);
-  startFc=getCenterHz();
-  moved=0;
- }
- 
- function move(e){
-  if(!isDown)return;
-  const r=els.waterfall.getBoundingClientRect();
-  const dx=getX(e)-startX;
-  moved=Math.max(moved,Math.abs(dx));
-  const shift=-dx/r.width*getSpan();
-  setCenterHz(clampView(startFc+shift,getSpan()));
- }
- 
- function end(e){
-  if(!isDown)return;
-  isDown=false;
-  if(moved<5){
-   const r=els.waterfall.getBoundingClientRect();
-   const x=clamp((getX(e)-r.left)/r.width,0,1);
-   state.listenHz=xToHz(x);
-   setStatus(`Tuned ${fmtHz(state.listenHz)} | ${els.mode.value}`);
+// ============================================================================
+// (8) Init
+// ============================================================================
+async function init(){
+  // CSV laden (falls URL gesetzt)
+  const url=document.getElementById("csvUrl").value.trim();
+  if(url){
+    const rows=await loadCsvSchedule(url);
+    rows.forEach(tx=>{ activeTx.push(tx); playSignal(tx); });
   }
- }
- 
- function wheel(e){
-  e.preventDefault();
-  const r=els.waterfall.getBoundingClientRect();
-  const x=clamp((e.clientX-r.left)/r.width,0,1);
-  applyZoom(Math.pow(1.3,-Math.sign(e.deltaY)),xToHz(x));
- }
- 
- function dbl(e){
-  const r=els.waterfall.getBoundingClientRect();
-  const x=clamp((e.clientX-r.left)/r.width,0,1);
-  const hz=xToHz(x);
-  setCenterHz(clampView(hz,getSpan()));
-  setStatus('Center '+fmtHz(hz));
- }
- 
- els.waterfall.addEventListener('mousedown',start);
- els.waterfall.addEventListener('mousemove',move);
- els.waterfall.addEventListener('mouseup',end);
- els.waterfall.addEventListener('wheel',wheel,{passive:false});
- els.waterfall.addEventListener('dblclick',dbl);
- els.waterfall.addEventListener('touchstart',start,{passive:false});
- els.waterfall.addEventListener('touchmove',move,{passive:false});
- els.waterfall.addEventListener('touchend',end);
- els.waterfall.addEventListener('contextmenu',e=>e.preventDefault());
+
+  // Füge Testsignale für den Wasserfall hinzu (dauerhaft sichtbar)
+  const fc = getCenterHz();
+  const span = getSpan();
+  activeTx.push(
+    { name: "TEST1", f: fc-span*0.15, bw: 2000, mode: "USB", type: "zivil", amp: 0.8, startMs: 0, endMs: 0, permanent: true },
+    { name: "TEST2", f: fc,            bw: 4000, mode: "AM",  type: "zivil", amp: 0.7, startMs: 0, endMs: 0, permanent: true },
+    { name: "TEST3", f: fc+span*0.18,  bw: 1200, mode: "CW",  type: "zivil", amp: 0.9, startMs: 0, endMs: 0, permanent: true }
+  );
+
+  // Footer Zeitstempel
+  const now=new Date();
+  const ts=now.toISOString().replace("T"," ").substring(0,19);
+  document.getElementById("footerText").textContent=
+    "© Anaxes Naval System – V:2.0 | "+ts;
+
+  mainLoop();
 }
 
-// Initialisierung
-function init(){
- signals=generateSignals();
- setFullBand();
- updateBwLabel();
- setupControls();
- setupInteraction();
- layout();
- // cache 2D contexts once
- state.ctx.spectrum=els.spectrum.getContext('2d',{alpha:true});
- state.ctx.waterfall=els.waterfall.getContext('2d',{alpha:true});
- if(state.ctx.spectrum)state.ctx.spectrum.imageSmoothingEnabled=false;
- if(state.ctx.waterfall)state.ctx.waterfall.imageSmoothingEnabled=false;
- setStatus('SDR Ready');
- 
- const now=new Date();
- const ts=now.getFullYear()+"-"+(now.getMonth()+1).toString().padStart(2,'0')+"-"+
-  now.getDate().toString().padStart(2,'0')+" "+now.getHours().toString().padStart(2,'0')+":"+
-  now.getMinutes().toString().padStart(2,'0')+":"+now.getSeconds().toString().padStart(2,'0');
- els.footerText.textContent="© Anaxes Naval System – Dev Timestamp: "+ts;
- 
- requestAnimationFrame(mainLoop);
-}
+document.addEventListener("DOMContentLoaded", function() {
+  init();
 
-// Event Listener
-window.addEventListener('error',e=>setStatus('Error: '+(e.message||'unknown')));
-window.addEventListener('unhandledrejection',e=>e.preventDefault());
-window.addEventListener('resize',layout);
- document.addEventListener('visibilitychange',()=>{
-  if(document.hidden)setStatus('Paused (background)');
- });
+  // === Canvas references for rendering ===
+  window.spectrum = document.getElementById('spectrum');
+  window.waterfall = document.getElementById('waterfall');
 
-if(document.readyState==='loading'){
- document.addEventListener('DOMContentLoaded',init);
-}else{
- setTimeout(init,10);
-}
+  // --- Utility functions needed by rendering and interaction ---
+  function getCenterHz() {
+    const v = parseFloat(document.getElementById('fCenter').value) || 0;
+    const u = document.getElementById('unit').value;
+    const mul = {Hz:1, kHz:1e3, MHz:1e6, GHz:1e9, THz:1e12}[u]||1;
+    return v*mul;
+  }
+  function getSpan() {
+    return parseFloat(document.getElementById('span').value) || 1e6;
+  }
+  function setSpanLabel() {
+    const v = getSpan();
+    let s = v>=1e12?(v/1e12).toFixed(3)+' THz':v>=1e9?(v/1e9).toFixed(3)+' GHz':v>=1e6?(v/1e6).toFixed(3)+' MHz':v>=1e3?(v/1e3).toFixed(1)+' kHz':v+' Hz';
+    document.getElementById('spanLbl').textContent = s;
+  }
+  function fmtHz(f){
+    const a=Math.abs(f);
+    if(a>=1e12)return(f/1e12).toFixed(3)+' THz';
+    if(a>=1e9)return(f/1e9).toFixed(3)+' GHz';
+    if(a>=1e6)return(f/1e6).toFixed(3)+' MHz';
+    if(a>=1e3)return(f/1e3).toFixed(1)+' kHz';
+    return f.toFixed(0)+' Hz';
+  }
+  function clamp(v,a,b){return Math.max(a,Math.min(v,b));}
+  function xToHz(x){
+    const fc=getCenterHz(),sp=getSpan();
+    return fc+(x-.5)*sp;
+  }
+
+  // --- Astronomical/Spur signals for visual interest ---
+  function generateSignals(){
+    const s={astroLines:[],spurs:[]};
+    const base=[['H I',1.420405751e9],['OH 1612',1.612231e9],['OH 1665',1.6654018e9],
+      ['CO(1-0)',115.2712018e9],['[C II]',1.900539e12]];
+    base.forEach(([name,f0])=>{
+      const v=(Math.random()-0.5)*400, f=f0+v*1e3, bw=Math.max(500,f*0.0001);
+      s.astroLines.push({name,f,bw,amp:0.5+Math.random()*0.3});
+    });
+    for(let i=0;i<8;i++)s.spurs.push({f:Math.random()*1e13,bw:Math.random()*8000+200,amp:0.15+Math.random()*0.2});
+    return s;
+  }
+  let signals = generateSignals();
+
+  // --- Canvas Management ---
+  function resizeCanvas(canvas,container){
+    const r=container.getBoundingClientRect();
+    const w=Math.max(32,Math.floor(r.width));
+    const h=Math.max(32,Math.floor(r.height));
+    if(canvas.width!==w||canvas.height!==h){
+      canvas.width=w;canvas.height=h;
+      canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';
+      return true;
+    }
+    return false;
+  }
+  function layout(){
+    resizeCanvas(spectrum,document.querySelector('.spectrum-container'));
+    resizeCanvas(waterfall,document.querySelector('.waterfall-container'));
+  }
+  window.addEventListener('resize',layout);
+  layout();
+
+  // --- Rendering ---
+  const TYPE_COLOR={zivil:'#ffd666',feindlich:'#ff5a5a',verbündet:'#63e28e','störung':'#c0a060',astronomisch:'#66ccff'};
+  function getSignalPower(hz,t,pxHz){
+    let power=0.03+(Math.random()-.5)*.015;
+    signals.astroLines.forEach(s=>{
+      const half=Math.max(s.bw*.5,pxHz*.5),d=Math.abs(hz-s.f);
+      if(d<half)power+=s.amp*(1-d/half);
+    });
+    signals.spurs.forEach(s=>{
+      const half=Math.max(s.bw*.5,pxHz),d=Math.abs(hz-s.f);
+      if(d<half)power+=s.amp*(1-d/half);
+    });
+    activeTx.forEach(tx=>{
+      const fc=tx.f,half=Math.max((tx.bw||2400)*.5,pxHz);
+      const d=Math.abs(hz-fc);
+      if(d<half)power+=(tx.amp||0.3)*(1-d/half);
+    });
+    return Math.max(0,power);
+  }
+  function drawSpectrum(){
+    const ctx = spectrum.getContext('2d');
+    const W = spectrum.width, H = spectrum.height;
+    if(W<1||H<1)return;
+    ctx.fillStyle='#0f1218';
+    ctx.fillRect(0,0,W,H);
+    const t=performance.now()/1000,pxHz=getSpan()/W;
+    let vmax=.1, data=new Float32Array(W);
+    for(let x=0;x<W;x++){
+      const hz=xToHz(x/W),v=getSignalPower(hz,t,pxHz);
+      data[x]=v; if(v>vmax)vmax=v;
+    }
+    if(vmax>0){
+      ctx.strokeStyle='#87a3ff';
+      ctx.beginPath();
+      const g=1/vmax;
+      for(let x=0;x<W;x++){
+        const y=H-(clamp(data[x]*g,0,1)*H);
+        if(x===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
+      }
+      ctx.stroke();
+    }
+    ctx.fillStyle='#b8c1e1';
+    ctx.font='10px monospace';
+    for(let i=0;i<=4;i++){
+      const hz=xToHz(i/4);
+      ctx.fillText(fmtHz(hz),i*W/4+2,12);
+    }
+    drawOverlays(ctx,W,H,pxHz);
+  }
+  function drawWaterfall(){
+    const ctx = waterfall.getContext('2d');
+    const W = waterfall.width, H = waterfall.height;
+    if(W<1||H<1)return;
+    // Verschiebe das Bild nach oben (wie SDR-Wasserfall)
+    ctx.drawImage(waterfall, 0, 1, W, H-1, 0, 0, W, H-1);
+    const img = ctx.createImageData(W,1);
+    const t=performance.now()/1000,pxHz=getSpan()/W;
+    let vmax=.1, data=new Float32Array(W);
+    for(let x=0;x<W;x++){
+      const hz=xToHz(x/W),v=getSignalPower(hz,t,pxHz);
+      data[x]=v; if(v>vmax)vmax=v;
+    }
+    for(let x=0;x<W;x++){
+      const q=clamp(data[x]/vmax,0,1);
+      // SDR-typische Färbung: von blau (schwach) bis gelb/weiß (stark)
+      img.data[x*4+0] = 40+Math.floor(220*q); // R
+      img.data[x*4+1] = 40+Math.floor(180*q); // G
+      img.data[x*4+2] = 80+Math.floor(100*q); // B
+      img.data[x*4+3] = 255;
+    }
+    ctx.putImageData(img, 0, H-1);
+  }
+  function drawOverlays(ctx,W,H,pxHz){
+    const fc=getCenterHz(),sp=getSpan(),fmin=fc-sp/2;
+    ctx.save();
+    // Astronomische Linien
+    ctx.fillStyle='#ffc94d';
+    signals.astroLines.forEach(s=>{
+      if(s.f>=fmin&&s.f<=fmin+sp){
+        const x=((s.f-fmin)/sp)*W;
+        ctx.fillRect(x,0,Math.max(1,pxHz/sp*W*2),4);
+      }
+    });
+    // Aktive Transmitter
+    activeTx.forEach(tx=>{
+      const col=TYPE_COLOR[tx.type]||'#8aa';
+      let xL=((tx.f-(tx.bw||2400)/2-fmin)/sp)*W;
+      let xR=((tx.f+(tx.bw||2400)/2-fmin)/sp)*W;
+      const w=Math.max(2,xR-xL);
+      ctx.fillStyle=col+'24';
+      ctx.fillRect(Math.max(0,xL),0,w,H);
+      ctx.strokeStyle=col+'8c';
+      ctx.beginPath();
+      ctx.moveTo(xL,0);ctx.lineTo(xL,H);
+      ctx.moveTo(xR,0);ctx.lineTo(xR,H);
+      ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.85)';
+      ctx.font='700 10px monospace';
+      ctx.fillText(`${tx.name||'TX'} [${tx.mode}]`,Math.max(2,xL+2),12);
+    });
+    ctx.restore();
+  }
+
+  // --- Animation Loop ---
+  function renderLoop(){
+    drawSpectrum();
+    drawWaterfall();
+    requestAnimationFrame(renderLoop);
+  }
+  requestAnimationFrame(renderLoop);
+
+  // --- Interaction: Pan, Zoom, Listen ---
+  let isDown=false,startX=0,startFc=0,moved=0;
+  spectrum.addEventListener('mousedown',function(e){
+    isDown=true; startX=e.clientX; startFc=getCenterHz(); moved=0;
+  });
+  spectrum.addEventListener('mousemove',function(e){
+    if(!isDown)return;
+    const r=spectrum.getBoundingClientRect();
+    const dx=e.clientX-startX;
+    moved=Math.max(moved,Math.abs(dx));
+    const shift=-dx/r.width*getSpan();
+    document.getElementById('fCenter').value=(startFc+shift)/1e6;
+    setSpanLabel();
+  });
+  spectrum.addEventListener('mouseup',function(e){isDown=false;});
+  spectrum.addEventListener('mouseleave',function(e){isDown=false;});
+  spectrum.addEventListener('wheel',function(e){
+    e.preventDefault();
+    const r=spectrum.getBoundingClientRect();
+    const x=clamp((e.clientX-r.left)/r.width,0,1);
+    const fc=getCenterHz(),span=getSpan();
+    const anchorHz=fc+(x-0.5)*span;
+    const factor=Math.pow(1.3,-Math.sign(e.deltaY));
+    const nsp=clamp(span/factor,1e3,1e13);
+    document.getElementById('span').value=nsp;
+    setSpanLabel();
+    document.getElementById('fCenter').value=(anchorHz-(x-0.5)*nsp)/1e6;
+  });
+  spectrum.addEventListener('dblclick',function(e){
+    const r=spectrum.getBoundingClientRect();
+    const x=clamp((e.clientX-r.left)/r.width,0,1);
+    const fc=getCenterHz(),span=getSpan();
+    const hz=fc+(x-0.5)*span;
+    document.getElementById('fCenter').value=hz/1e6;
+    setSpanLabel();
+  });
+  spectrum.addEventListener('click',function(e){
+    const r=spectrum.getBoundingClientRect();
+    const x=clamp((e.clientX-r.left)/r.width,0,1);
+    const fc=getCenterHz(),span=getSpan();
+    const hz=fc+(x-0.5)*span;
+    document.getElementById('status').textContent='Tuned to '+fmtHz(hz);
+  });
+
+   // --- Update span label on input ---
+  document.getElementById('span').addEventListener('input', setSpanLabel);
+   setSpanLabel();
+});
 })();
 </script>
-</body>
-</html>
