@@ -10,17 +10,29 @@
 html,body{height:100%;background:#12151b;color:var(--fg);overflow:hidden}
 body{display:flex;flex-direction:column;min-height:100vh}
 
-.wip-banner{position:relative;height:40px;overflow:hidden;background:#000;z-index:100}
-.wip-stripes{position:absolute;inset:0;pointer-events:none;opacity:.8;
- background:repeating-linear-gradient(45deg,#ffd400 0,#ffd400 10px,#000 10px,#000 20px);
- animation:wipStripes 2s linear infinite}
-@keyframes wipStripes{0%{transform:translateX(0)}100%{transform:translateX(20px)}}
-.wip-banner__text{position:relative;display:flex;align-items:center;justify-content:center;
- gap:12px;height:40px;white-space:nowrap;color:#fff;font-weight:700;letter-spacing:.1em;
- text-shadow:1px 1px 2px #000}
+/* --- Neues WIP-Banner --- */
+.wip-banner{
+  position:relative;width:100%;height:40px;overflow:hidden;
+  background:rgba(0,0,0,.6);margin-bottom:10px;z-index:2000;
+}
+.wip-banner::before{
+  content:"";position:absolute;top:0;left:0;width:200%;height:100%;
+  background:repeating-linear-gradient(45deg, transparent 0 20px, yellow 20px 40px);
+  animation:slide 12s linear infinite;opacity:.9;
+}
+.wip-banner__text{
+  position:absolute;top:0;left:0;width:200%;
+  line-height:40px;text-align:center;white-space:nowrap;
+  color:#fff;font-weight:900;letter-spacing:.12em;
+  text-shadow:0 0 2px #000,0 0 4px #000,0 0 6px rgba(0,0,0,.6);
+  animation:slide 12s linear infinite;
+}
+@keyframes slide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
+
+/* ...restliche bestehende Styles... */
+.wip-stripes{display:none;} /* Deaktiviert alte Streifen */
 .wip-btn{border:1px solid #333;border-radius:4px;padding:4px 8px;background:#141414;
  color:#fff;cursor:pointer;font:inherit}
-
 header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
  gap:12px;align-items:center;flex-shrink:0}
 .wrap{flex:1;min-height:0;padding:12px;overflow:hidden}
@@ -32,7 +44,6 @@ header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
 .waterfall-container{flex:1}
 canvas{background:#0a0c11;border:1px solid var(--line);border-radius:4px;
  display:block;width:100%;height:100%;image-rendering:pixelated}
-
 aside.panel{border:1px solid var(--line);border-radius:4px;padding:10px;
  background:#0f1218;height:100%;overflow-y:auto}
 input,select,button{background:#0b0e14;border:1px solid var(--line);border-radius:3px;
@@ -42,10 +53,8 @@ input,select,button{background:#0b0e14;border:1px solid var(--line);border-radiu
 .row input,.row select{width:180px;margin-right:4px}
 .row button{margin-right:4px}
 .small{font-size:11px;color:var(--muted)}
-
 footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
  font-size:11px;flex-shrink:0}
-
 @media (max-width:800px){
  .layout{flex-direction:column}
  .maincol,.sidecol{width:100%}
@@ -54,14 +63,10 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
 </style>
 </head>
 <body>
-<div class="wip-banner">
- <div class="wip-stripes"></div>
- <div class="wip-banner__text">
-  ⚠️ STARSHIP COMMS SDR PROTOTYP ⚠️
-  <button id="audioStart" class="wip-btn">Audio Start</button>
-  <button id="audioToggle" class="wip-btn" style="display:none">Audio Pause</button>
- </div>
-</div>
+  <!-- Neues WIP-Banner -->
+  <div class="wip-banner">
+    <span class="wip-banner__text">⚠️ Work in Progress – Kommonikations Konsole wird noch entwickelt ⚠️</span>
+  </div>
 <header>
  <h1>STARSHIP COMMS SDR</h1>
  <span class="small">Wheel=Zoom • Drag=Pan • Click=Listen • DblClick=Center</span>
@@ -123,7 +128,7 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
   </div>
  </div>
 </div>
-<footer><div class="small" id="footerText">© Anaxes Naval System – Realistische EM-Signal-Synthese v2.1</div></footer>
+<footer><div class="small" id="footerText">© Anaxes Naval System – v2.1</div></footer>
 
 <script>
 (function(){'use strict';
