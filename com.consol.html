@@ -41,6 +41,25 @@ header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
 .sidecol{width:30%;min-width:280px;flex-shrink:0}
 .canvas-container{height:100%;display:flex;flex-direction:column}
 .spectrum-container{height:30%;margin-bottom:8px}
+.waterfall-container {
+  flex: 1;
+  background: #000;
+  border-radius: 0 0 4px 4px;
+  overflow: hidden;
+  /* Entferne margin/padding für bündigen Look */
+  margin: 0;
+  padding: 0;
+}
+canvas#waterfall {
+  background: #000;
+  border: none;
+  border-radius: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  /* Optional: für scharfe Farben */
+}
 .waterfall-container{flex:1}
 canvas{background:#0a0c11;border:1px solid var(--line);border-radius:4px;
  display:block;width:100%;height:100%;image-rendering:pixelated}
@@ -445,9 +464,54 @@ async function init(){
     { name: "TEST3", f: fc+span*0.18,  bw: 1200, mode: "CW",  type: "zivil", amp: 0.9, startMs: 0, endMs: 0, permanent: true }
   );
 
+  // === Zufällige zivile Kommunikation mit Inhalt ===
+  // Erzeuge 8-15 breite, realistische zivile Signale mit zufälligen, plausiblen Inhalten
+  const now = Date.now();
+  const civilianModes = ["USB", "AM", "FM", "LSB"];
+  const civilianNames = ["CIVIL", "SHIP", "AIR", "COM", "SAT", "TOWER", "GROUND", "WX"];
+  const civilianContents = [
+    "REQUEST LANDING CLEARANCE",
+    "ROGER, PROCEED TO RUNWAY 27",
+    "WEATHER REPORT: VISIBILITY 10KM, WIND 270/12KT",
+    "CHECK-IN: FLIGHT 1234, POSITION 50N 8E",
+    "CARGO STATUS: ALL SECURED",
+    "CONTACT GROUND FOR TAXI INSTRUCTIONS",
+    "EMERGENCY DRILL SCHEDULED AT 14:00 UTC",
+    "MAINTENANCE REQUIRED ON ANTENNA ARRAY",
+    "SATCOM LINK ESTABLISHED, DATA TRANSFER INITIATED",
+    "CREW CHANGE COMPLETE, READY FOR DEPARTURE",
+    "FUEL LEVEL AT 78 PERCENT",
+    "SECURITY CHECK PASSED, ACCESS GRANTED",
+    "ROUTINE SYSTEMS CHECK: ALL GREEN",
+    "PASSENGER MANIFEST RECEIVED",
+    "COMMUNICATIONS NOMINAL"
+  ];
+  const nSignals = 8 + Math.floor(Math.random() * 8);
+  for(let i=0; i<nSignals; ++i) {
+    const f = fc - span*0.45 + Math.random()*span*0.9;
+    const bw = 2000 + Math.random()*10000;
+    const amp = 0.3 + Math.random()*0.5;
+    const mode = civilianModes[Math.floor(Math.random()*civilianModes.length)];
+    const name = civilianNames[Math.floor(Math.random()*civilianNames.length)];
+    // Inhalt zufällig wählen
+    const content = civilianContents[Math.floor(Math.random()*civilianContents.length)];
+    activeTx.push({
+      name,
+      f,
+      bw,
+      mode,
+      type: "zivil",
+      amp,
+      content,
+      startMs: now,
+      endMs: now + 60000 + Math.random()*120000, // 1-3 Minuten
+      permanent: true
+    });
+  }
+
   // Footer Zeitstempel
-  const now=new Date();
-  const ts=now.toISOString().replace("T"," ").substring(0,19);
+  const now2=new Date();
+  const ts=now2.toISOString().replace("T"," ").substring(0,19);
   document.getElementById("footerText").textContent=
     "© Anaxes Naval System – V:2.0 | "+ts;
 
@@ -535,10 +599,23 @@ document.addEventListener("DOMContentLoaded", function() {
       const half=Math.max(s.bw*.5,pxHz),d=Math.abs(hz-s.f);
       if(d<half)power+=s.amp*(1-d/half);
     });
+    // --- Zivile Kommunikation sichtbar machen ---
     activeTx.forEach(tx=>{
-      const fc=tx.f,half=Math.max((tx.bw||2400)*.5,pxHz);
-      const d=Math.abs(hz-fc);
-      if(d<half)power+=(tx.amp||0.3)*(1-d/half);
+      // Nur zivil, mit Inhalt, und Bandbreite > 2000 Hz (damit keine dünnen Linien)
+      if(tx.type==="zivil" && tx.content && tx.bw > 2000){
+        const fc=tx.f,half=Math.max((tx.bw||2400)*.5,pxHz*2);
+        const d=Math.abs(hz-fc);
+        if(d<half) {
+          // Mehr Power für breite Signale
+          power += (tx.amp||0.5)*(1-d/half)*1.7;
+        }
+      }
+      // Andere (Test, ohne Inhalt) wie gehabt
+      else if(tx.type==="zivil"){
+        const fc=tx.f,half=Math.max((tx.bw||2400)*.5,pxHz);
+        const d=Math.abs(hz-fc);
+        if(d<half)power+=(tx.amp||0.3)*(1-d/half);
+      }
     });
     return Math.max(0,power);
   }
@@ -576,7 +653,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const ctx = waterfall.getContext('2d');
     const W = waterfall.width, H = waterfall.height;
     if(W<1||H<1)return;
-    // Verschiebe das Bild nach oben (wie SDR-Wasserfall)
+    // SDR-typische Farben: Schwarz als Basis, Signal von dunkelblau → violett → gelb/weiß
     ctx.drawImage(waterfall, 0, 1, W, H-1, 0, 0, W, H-1);
     const img = ctx.createImageData(W,1);
     const t=performance.now()/1000,pxHz=getSpan()/W;
@@ -587,10 +664,22 @@ document.addEventListener("DOMContentLoaded", function() {
     }
     for(let x=0;x<W;x++){
       const q=clamp(data[x]/vmax,0,1);
-      // SDR-typische Färbung: von blau (schwach) bis gelb/weiß (stark)
-      img.data[x*4+0] = 40+Math.floor(220*q); // R
-      img.data[x*4+1] = 40+Math.floor(180*q); // G
-      img.data[x*4+2] = 80+Math.floor(100*q); // B
+      // Farbverlauf: 0=blau, 0.5=violett, 1=gelb/weiß
+      let r=0,g=0,b=0;
+      if(q<0.5){
+        // Blau bis Violett
+        r = Math.floor(128*q*2);
+        g = 0;
+        b = Math.floor(255*(0.5+q));
+      } else {
+        // Violett bis Gelb/Weiß
+        r = Math.floor(255*(q-0.5)*2 + 128);
+        g = Math.floor(255*(q-0.5)*2);
+        b = Math.floor(255*(1-q));
+      }
+      img.data[x*4+0] = r;
+      img.data[x*4+1] = g;
+      img.data[x*4+2] = b;
       img.data[x*4+3] = 255;
     }
     ctx.putImageData(img, 0, H-1);
