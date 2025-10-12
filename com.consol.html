@@ -29,10 +29,6 @@ body{display:flex;flex-direction:column;min-height:100vh}
 }
 @keyframes slide{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
-/* ...restliche bestehende Styles... */
-.wip-stripes{display:none;} /* Deaktiviert alte Streifen */
-.wip-btn{border:1px solid #333;border-radius:4px;padding:4px 8px;background:#141414;
- color:#fff;cursor:pointer;font:inherit}
 header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
  gap:12px;align-items:center;flex-shrink:0}
 .wrap{flex:1;min-height:0;padding:12px;overflow:hidden}
@@ -41,39 +37,20 @@ header{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;
 .sidecol{width:30%;min-width:280px;flex-shrink:0}
 .canvas-container{height:100%;display:flex;flex-direction:column}
 .spectrum-container{height:30%;margin-bottom:8px}
-.waterfall-container {
-  flex: 1;
-  background: #000;
-  border-radius: 0 0 4px 4px;
-  overflow: hidden;
-  /* Entferne margin/padding für bündigen Look */
-  margin: 0;
-  padding: 0;
+.waterfall-container{
+  flex:1;background:#000;border-radius:0 0 4px 4px;overflow:hidden;position:relative;
+  margin:0;padding:0;
 }
-canvas#waterfall {
-  background: #000;
-  border: none;
-  border-radius: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  image-rendering: pixelated;
-  /* Optional: für scharfe Farben */
-}
-.waterfall-container{flex:1}
-canvas{background:#0a0c11;border:1px solid var(--line);border-radius:4px;
- display:block;width:100%;height:100%;image-rendering:pixelated}
-aside.panel{border:1px solid var(--line);border-radius:4px;padding:10px;
- background:#0f1218;height:100%;overflow-y:auto}
-input,select,button{background:#0b0e14;border:1px solid var(--line);border-radius:3px;
- color:var(--fg);padding:4px;font-size:12px;font:inherit}
+canvas#waterfall{background:#000;border:none;border-radius:0;display:block;width:100%;height:100%;image-rendering:pixelated}
+canvas{background:#0a0c11;border:1px solid var(--line);border-radius:4px;display:block;width:100%;height:100%;image-rendering:pixelated}
+aside.panel{border:1px solid var(--line);border-radius:4px;padding:10px;background:#0f1218;height:100%;overflow-y:auto}
+input,select,button{background:#0b0e14;border:1px solid var(--line);border-radius:3px;color:var(--fg);padding:4px;font-size:12px;font:inherit}
 .row{display:block;margin-bottom:8px}
 .row label{display:inline-block;width:70px;font-size:11px;color:var(--muted)}
 .row input,.row select{width:180px;margin-right:4px}
 .row button{margin-right:4px}
 .small{font-size:11px;color:var(--muted)}
-footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
- font-size:11px;flex-shrink:0}
+footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);font-size:11px;flex-shrink:0}
 @media (max-width:800px){
  .layout{flex-direction:column}
  .maincol,.sidecol{width:100%}
@@ -82,7 +59,6 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
 </style>
 </head>
 <body>
-  <!-- Neues WIP-Banner -->
   <div class="wip-banner">
     <span class="wip-banner__text">⚠️ Work in Progress – Kommonikations Konsole wird noch entwickelt ⚠️</span>
   </div>
@@ -101,13 +77,8 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
   <div class="sidecol">
    <aside class="panel">
     <div class="row">
-     <label>CSV-Plan:</label>
-     <input id="csvUrl" placeholder="https://.../export?format=csv">
-     <button id="csvLoad">Laden</button>
-    </div>
-    <div class="row">
      <label>Freq:</label>
-     <input id="fCenter" type="number" step="1" min="0" max="1000000000000000" value="500000000000000">
+     <input id="fCenter" type="number" step="1" min="0" max="1000000000000000" value="500000000">
      <select id="unit">
       <option>Hz</option><option>kHz</option><option selected>MHz</option>
       <option>GHz</option><option>THz</option>
@@ -115,7 +86,7 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
     </div>
     <div class="row">
      <label>Span:</label>
-     <input id="span" type="range" min="1000" max="1000000000000000" step="1000000" value="1000000000000000" style="width:150px">
+     <input id="span" type="range" min="1000" max="1000000000000000" step="1000000" value="10000000" style="width:150px">
      <div class="small" id="spanLbl"></div>
     </div>
     <div class="row">
@@ -148,9 +119,13 @@ footer{padding:6px 12px;border-top:1px solid var(--line);color:var(--muted);
  </div>
 </div>
 <footer><div class="small" id="footerText">© Anaxes Naval System – v2.1</div></footer>
-
 <script>
 (function(){'use strict';
+// ============================================================================
+// (0) Feste CSV-Quelle
+// ============================================================================
+const FIXED_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vQLm4RQk4KPUZsW1v6TgF9_z0HaRIFSWdQXJsh2DEIx1zFaENslA1xvQ8aWJONZadNi0MCU2ZynrTH_/pub?output=csv";
+
 // ============================================================================
 // (1) Teilnehmer, Konversationstypen und Konversations-Engine
 // ============================================================================
@@ -161,204 +136,143 @@ const parties = [
 
 const conversationTemplates = {
   logistics: [
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `EMAIL TO: ${conv.to} SUBJECT: REQUEST ${100+Math.floor(Math.random()*200)} CRATES FOOD ETA ASAP`
-    }),
-    (conv) => ({
-      from: conv.to, to: conv.from,
-      content: `REPLY FROM: ${conv.to} SUBJECT: CONFIRMED ETA ${["14:00 UTC","16:30 UTC","ASAP"][Math.floor(Math.random()*3)]}`
-    }),
-    (conv) => ({
-      from: conv.from, to: "OPS@HUB.NET",
-      content: `EMAIL TO: OPS@HUB.NET SUBJECT: UPDATE DELIVERY +${(1+Math.floor(Math.random()*2)).toString().padStart(2,"0")}:${(10+Math.floor(Math.random()*40)).toString().padStart(2,"0")} DELAY`
-    }),
-    (conv) => ({
-      from: "OPS@HUB.NET", to: conv.from,
-      content: `REPLY FROM: OPS@HUB.NET SUBJECT: RECEIVED STOP`
-    })
+    (conv) => ({ from: conv.from, to: conv.to,
+      content: `EMAIL TO: ${conv.to} SUBJECT: REQUEST ${100+Math.floor(Math.random()*200)} CRATES FOOD ETA ASAP` }),
+    (conv) => ({ from: conv.to, to: conv.from,
+      content: `REPLY FROM: ${conv.to} SUBJECT: CONFIRMED ETA ${["14:00 UTC","16:30 UTC","ASAP"][Math.floor(Math.random()*3)]}` }),
+    (conv) => ({ from: conv.from, to: "OPS@HUB.NET",
+      content: `EMAIL TO: OPS@HUB.NET SUBJECT: UPDATE DELIVERY +${(1+Math.floor(Math.random()*2)).toString().padStart(2,"0")}:${(10+Math.floor(Math.random()*40)).toString().padStart(2,"0")} DELAY` }),
+    (conv) => ({ from: "OPS@HUB.NET", to: conv.from,
+      content: `REPLY FROM: OPS@HUB.NET SUBJECT: RECEIVED STOP` })
   ],
   personal: [
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `HELLO ${conv.to.split("@")[0]} STOP ARRIVING STATION ${10+Math.floor(Math.random()*10)} AT ${17+Math.floor(Math.random()*3)}:${(10+Math.floor(Math.random()*50)).toString().padStart(2,"0")}`
-    }),
-    (conv) => ({
-      from: conv.to, to: conv.from,
-      content: `REPLY ${conv.from.split("@")[0]} STOP SEE YOU AT DOCK ${1+Math.floor(Math.random()*4)}`
-    }),
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `${conv.from.split("@")[0]} STOP BRINGING PACKAGE STOP`
-    })
+    (conv) => ({ from: conv.from, to: conv.to,
+      content: `HELLO ${conv.to.split("@")[0]} STOP ARRIVING STATION ${10+Math.floor(Math.random()*10)} AT ${17+Math.floor(Math.random()*3)}:${(10+Math.floor(Math.random()*50)).toString().padStart(2,"0")}` }),
+    (conv) => ({ from: conv.to, to: conv.from,
+      content: `REPLY ${conv.from.split("@")[0]} STOP SEE YOU AT DOCK ${1+Math.floor(Math.random()*4)}` }),
+    (conv) => ({ from: conv.from, to: conv.to,
+      content: `${conv.from.split("@")[0]} STOP BRINGING PACKAGE STOP` })
   ],
   system: [
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `SYSLOG: NODE-17 ONLINE VERSION 2.5.${Math.floor(Math.random()*10)}`
-    }),
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `SYSLOG: NODE-17 CHECKSUM OK`
-    }),
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `SYSLOG: NODE-18 WARNING TEMP HIGH ${75+Math.floor(Math.random()*10)}C`
-    }),
-    (conv) => ({
-      from: conv.from, to: conv.to,
-      content: `SYSLOG: NODE-18 NORMALIZED TEMP ${55+Math.floor(Math.random()*10)}C`
-    })
+    (conv) => ({ from: conv.from, to: conv.to, content: `SYSLOG: NODE-17 ONLINE VERSION 2.5.${Math.floor(Math.random()*10)}` }),
+    (conv) => ({ from: conv.from, to: conv.to, content: `SYSLOG: NODE-17 CHECKSUM OK` }),
+    (conv) => ({ from: conv.from, to: conv.to, content: `SYSLOG: NODE-18 WARNING TEMP HIGH ${75+Math.floor(Math.random()*10)}C` }),
+    (conv) => ({ from: conv.from, to: conv.to, content: `SYSLOG: NODE-18 NORMALIZED TEMP ${55+Math.floor(Math.random()*10)}C` })
   ]
 };
 
-function pickRandom(arr) { return arr[Math.floor(Math.random()*arr.length)]; }
+function pickRandom(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 
 function newConversation(){
-  const types = ["logistics","personal","system"];
-  const type = pickRandom(types);
-  let from, to;
+  const types=["logistics","personal","system"];
+  const type=pickRandom(types);
+  let from,to;
   if(type==="logistics"){
-    from = pickRandom(["OPS@HUB.NET","CREW01@SHIP","HQ@FLEET.GOV"]);
-    to = pickRandom(["SUPPLY@CORP.COM","OPS@HUB.NET"]);
-    if(from===to) to = "SUPPLY@CORP.COM";
-  } else if(type==="personal"){
-    from = pickRandom(["ANNA@HOME.NET","JOHN@MAIL.COM"]);
-    to = from==="ANNA@HOME.NET" ? "JOHN@MAIL.COM" : "ANNA@HOME.NET";
-  } else if(type==="system"){
-    from = pickRandom(["NODE-17","NODE-18","MAINT@STATION"]);
-    to = "";
+    from=pickRandom(["OPS@HUB.NET","CREW01@SHIP","HQ@FLEET.GOV"]);
+    to=pickRandom(["SUPPLY@CORP.COM","OPS@HUB.NET"]); if(from===to) to="SUPPLY@CORP.COM";
+  }else if(type==="personal"){
+    from=pickRandom(["ANNA@HOME.NET","JOHN@MAIL.COM"]);
+    to=from==="ANNA@HOME.NET"?"JOHN@MAIL.COM":"ANNA@HOME.NET";
+  }else{
+    from=pickRandom(["NODE-17","NODE-18","MAINT@STATION"]); to="";
   }
-  return {
-    type,
-    step: 0,
-    max: conversationTemplates[type].length,
-    from,
-    to,
-    history: []
-  };
+  return {type,step:0,max:conversationTemplates[type].length,from,to,history:[]};
 }
-
 function advanceConversation(conv){
-  conv.step++;
-  if(conv.step > conv.max) return null;
-  const tpl = conversationTemplates[conv.type][conv.step-1];
-  if(!tpl) return null;
-  const msg = tpl(conv);
-  // Für Systemmeldungen Wiederholung erlauben, sonst keine Duplikate
+  conv.step++; if(conv.step>conv.max) return null;
+  const tpl=conversationTemplates[conv.type][conv.step-1]; if(!tpl) return null;
+  const msg=tpl(conv);
   if(conv.type!=="system" && conv.history.includes(msg.content)) return null;
-  conv.history.push(msg.content);
-  return msg;
+  conv.history.push(msg.content); return msg;
 }
 
 // ============================================================================
-// (2) Signal-Generator-Klassen (aus deinem Original übernommen)
+// (2) Audio-Signal
 // ============================================================================
 class EMSignalGenerator {
-  constructor(audioCtx,freq,mode){
-    this.ctx=audioCtx; this.freq=freq; this.mode=mode;
-    this.osc=null; this.gain=null; this.started=false;
-  }
+  constructor(audioCtx,freq,mode){ this.ctx=audioCtx; this.freq=freq; this.mode=mode; this.osc=null; this.gain=null; this.started=false; }
   start(){
-    if(this.started) return;
-    this.started=true;
-    this.osc=this.ctx.createOscillator();
-    this.gain=this.ctx.createGain();
-    this.gain.gain.value=0;
+    if(this.started) return; this.started=true;
+    this.osc=this.ctx.createOscillator(); this.gain=this.ctx.createGain(); this.gain.gain.value=0;
     this.osc.connect(this.gain).connect(this.ctx.destination);
-
-    switch(this.mode){
-      case "CW": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
-      case "USB": case "LSB": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
-      case "AM": this.osc.type="square"; this.osc.frequency.value=this.freq; break;
-      case "FM": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
-      case "PSK": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
-      case "FSK": this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
-      default: this.osc.type="sine"; this.osc.frequency.value=this.freq; break;
-    }
-    this.osc.start();
+    this.osc.type="sine"; this.osc.frequency.value=this.freq; this.osc.start();
   }
-  stop(){
-    if(!this.started) return;
-    try{ this.osc.stop(); }catch{}
-    this.started=false;
-  }
-  setGain(v){
-    if(this.gain) this.gain.gain.setValueAtTime(v,this.ctx.currentTime);
-  }
+  stop(){ if(!this.started) return; try{this.osc.stop();}catch{} this.started=false; }
+  setGain(v){ if(this.gain) this.gain.gain.setValueAtTime(v,this.ctx.currentTime); }
 }
 
 // ============================================================================
-// (3) Morse-CW Map für Text→Morse
+// (3) Morse
 // ============================================================================
-const MORSE = {
-  "A":".-","B":"-...","C":"-.-.","D":"-..","E":".","F":"..-.","G":"--.","H":"....","I":"..","J":".---","K":"-.-","L":".-..",
-  "M":"--","N":"-.","O":"---","P":".--.","Q":"--.-","R":".-.","S":"...","T":"-","U":"..-","V":"...-","W":".--","X":"-..-",
-  "Y":"-.--","Z":"--..","0":"-----","1":".----","2":"..---","3":"...--","4":"....-","5":".....","6":"-....","7":"--...","8":"---..","9":"----.",
-  ".":".-.-.-",",":"--..--","?":"..--..","/":"-..-.","=":"-...-","-":"-....-","(":"-.--.",")":"-.--.-","+":".-.-.",":":"---...","'":".----.",
-  "Ä":".-.-","Ö":"---.","Ü":"..--","Ñ":"--.--","CH":"----"," ":" "
-};
+const MORSE={"A":".-","B":"-...","C":"-.-.","D":"-..","E":".","F":"..-.","G":"--.","H":"....","I":"..","J":".---","K":"-.-","L":".-..",
+"M":"--","N":"-.","O":"---","P":".--.","Q":"--.-","R":".-.","S":"...","T":"-","U":"..-","V":"...-","W":".--","X":"-..-",
+"Y":"-.--","Z":"--..","0":"-----","1":".----","2":"..---","3":"...--","4":"....-","5":".....","6":"-....","7":"--...","8":"---..","9":"----.",
+".":".-.-.-",",":"--..--","?":"..--..","/":"-..-.","=":"-...-","-":"-....-","(":"-.--.",")":"-.--.-","+":".-.-.",":":"---...","'":".----.",
+"Ä":".-.-","Ö":"---.","Ü":"..--","Ñ":"--.--","CH":"----"," ":" "};
 function textToMorse(text){
-  const up = text.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-  let out = [], i=0;
+  const up=text.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+  let out=[],i=0;
   while(i<up.length){
-    if (i+1<up.length && up[i]==='C' && up[i+1]==='H' && MORSE["CH"]) {
-      out.push(MORSE["CH"]); i+=2; continue;
-    }
-    const ch = up[i]; out.push(MORSE[ch] ?? ''); i++;
+    if(i+1<up.length && up[i]==='C' && up[i+1]==='H' && MORSE["CH"]){ out.push(MORSE["CH"]); i+=2; continue; }
+    const ch=up[i]; out.push(MORSE[ch]??''); i++;
   }
   return out.join(' ');
 }
 
 // ============================================================================
-// (4) Audio-Setup + Steuerung
+// (4) Audio-Setup
 // ============================================================================
-let audioCtx=null;
-function initAudio(){
-  if(audioCtx) return audioCtx;
-  audioCtx=new (window.AudioContext||window.webkitAudioContext)();
-  return audioCtx;
-}
-
-let activeGenerators=[];
+let audioCtx=null, activeGenerators=[];
+function initAudio(){ if(audioCtx) return audioCtx; audioCtx=new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
 function playSignal(tx){
   const ctx=initAudio();
   const g=new EMSignalGenerator(ctx,tx.f,tx.mode);
   g.start(); g.setGain(tx.amp||0.2);
   activeGenerators.push(g);
-
-  // falls CW: Text→Morse keying
   if(tx.mode==="CW" && tx.content){
-    const morse=textToMorse(tx.content);
-    const unit=1.2/20; // 20wpm default
-    let t=ctx.currentTime;
+    const morse=textToMorse(tx.content); const unit=1.2/20; let t=ctx.currentTime;
     for(const s of morse){
       if(s==="."){ g.gain.gain.setValueAtTime(tx.amp,t); t+=unit; g.gain.gain.setValueAtTime(0,t); t+=unit; }
       else if(s==="-"){ g.gain.gain.setValueAtTime(tx.amp,t); t+=3*unit; g.gain.gain.setValueAtTime(0,t); t+=unit; }
       else if(s===" "){ t+=7*unit; }
     }
   }
-  setTimeout(()=>{ g.stop(); activeGenerators=activeGenerators.filter(x=>x!==g); },
-              tx.endMs-Date.now());
+  setTimeout(()=>{ g.stop(); activeGenerators=activeGenerators.filter(x=>x!==g); }, tx.endMs-Date.now());
 }
+
 // ============================================================================
-// (5) CSV-Parser für externe Schedules
+// (5) Feste CSV-Parser + Loader
 // ============================================================================
 function parseCsvSchedule(text){
   const lines=text.split(/\r?\n/).filter(l=>l.trim().length>0);
   if(lines.length===0) return [];
   const header=lines[0].split(',').map(h=>h.trim().toLowerCase());
-  const idxF=header.indexOf("freq_hz");
-  const idxMode=header.indexOf("mode");
-  const idxContent=header.indexOf("text");
-  const idxDur=header.indexOf("duration");
+
+  const idxF=header.indexOf("frequenz");
+  const idxMode=header.indexOf("modus");
+  const idxContent=header.indexOf("inhalt");
+  const idxDur=header.indexOf("dauer");
+
   const rows=[];
   for(let i=1;i<lines.length;i++){
     const cols=lines[i].split(',');
-    const f=parseFloat(cols[idxF])||1000;
+
+    // Frequenz in Hz umrechnen (Sheet hat MHz/kHz gemischt)
+    let fStr=(cols[idxF]||"0").toLowerCase().replace("mhz","").replace("khz","").trim();
+    let f=parseFloat(fStr)||0;
+    if(cols[idxF].toLowerCase().includes("mhz")) f*=1e6;
+    else if(cols[idxF].toLowerCase().includes("khz")) f*=1e3;
+
     const mode=(cols[idxMode]||"CW").toUpperCase();
     const content=cols[idxContent]||"TEST";
-    const dur=parseInt(cols[idxDur]||"5000");
+    // Dauer im Format 0:01:24 -> Sekunden
+    let dur=5000;
+    if(cols[idxDur]){
+      const parts=cols[idxDur].split(':').map(x=>parseInt(x)||0);
+      if(parts.length===3) dur=(parts[0]*3600+parts[1]*60+parts[2])*1000;
+      else if(parts.length===2) dur=(parts[0]*60+parts[1])*1000;
+    }
+
     rows.push({
       name:"CSV",
       f,
@@ -373,74 +287,147 @@ function parseCsvSchedule(text){
   }
   return rows;
 }
-async function loadCsvSchedule(url){
+
+async function loadFixedCsv(){
   try{
-    const res=await fetch(url,{cache:"no-store"});
+    const res=await fetch(FIXED_CSV_URL,{cache:"no-store"});
     const text=await res.text();
     return parseCsvSchedule(text);
   }catch(e){ console.error("CSV Fehler",e); return []; }
 }
+// --- Utils: Frequenz-Parsing  mHz, Hz, kHz, MHz, GHz, THz ---
+function parseFreqToHz(s){
+  if(!s) return 0;
+  const m = String(s).trim().replace(',', '.').match(/([\d.+-eE]+)\s*([a-zA-Z]*)/);
+  if(!m) return 0;
+  const v = parseFloat(m[1]);
+  const u = (m[2]||'hz').toLowerCase();
+  const mul = {
+    'mhz':1e6,   // Falls jemand "mHz" eigentlich als MHz meinte? -> unten richtige mHz
+    'khz':1e3,
+    'hz':1,
+    'ghz':1e9,
+    'thz':1e12,
+    'mh':1e-3,   // echte mHz (millihertz) Schreibfehler-Varianten abfangen
+    'mhz_milli':1e-3
+  };
+  // echte mHz sauber erkennen
+  if(/(^|[^a-z])mhz$/.test(u) && /mHz/.test(String(s))) return v*1e-3;
+  if(u in mul) return v*mul[u];
+  // Einheiten wie "M", "K", "G", "T"
+  if(u==='m') return v*1e6;
+  if(u==='k') return v*1e3;
+  if(u==='g') return v*1e9;
+  if(u==='t') return v*1e12;
+  return v; // reine Hz
+}
+
+// Dauer "HH:MM:SS" -> ms
+function parseDurMs(s){
+  if(!s) return 5000;
+  const p = String(s).trim().split(':').map(x=>parseInt(x)||0);
+  if(p.length===3) return (p[0]*3600+p[1]*60+p[2])*1000;
+  if(p.length===2) return (p[0]*60+p[1])*1000;
+  return parseInt(s)||5000;
+}
+
+function parseCsvSchedule(text){
+  const lines = text.split(/\r?\n/).filter(l=>l.trim().length>0);
+  if(!lines.length) return [];
+  const header = lines[0].split(',').map(h=>h.trim().toLowerCase());
+
+  const idxF   = header.indexOf('frequenz');
+  const idxMod = header.indexOf('modus');
+  const idxDur = header.indexOf('dauer');
+  const idxTxt = header.indexOf('inhalt');
+
+  const out = [];
+  for(let i=1;i<lines.length;i++){
+    const cols = lines[i].split(',');
+    const fHz = parseFreqToHz(cols[idxF]||'0');
+    const mode = String(cols[idxMod]||'CW').toUpperCase();
+    const dur = parseDurMs(cols[idxDur]);
+    const content = cols[idxTxt]||'';
+    out.push({
+      name:'CSV',
+      f: fHz,
+      bw: mode==='CW'?500:2500,
+      mode,
+      type:'zivil',
+      content,
+      amp:0.45,
+      startMs: Date.now(),
+      endMs: Date.now()+dur
+    });
+  }
+  return out;
+}
+
+async function loadFixedCsv(){
+  try{
+    const res = await fetch(FIXED_CSV_URL,{cache:'no-store'});
+    const text = await res.text();
+    const rows = parseCsvSchedule(text);
+
+    // Auto-Viewport 0…100 THz, aber so zentrieren, dass alle CSV-Frequenzen sichtbar sind
+    if(rows.length){
+      const minF = Math.max(0, Math.min(...rows.map(r=>r.f)));
+      const maxF = Math.min(1e14, Math.max(...rows.map(r=>r.f))); // 100 THz
+      const span = Math.max(1e3, (maxF-minF)||1e6);
+      const center = minF + span/2;
+
+      // UI setzen
+      const unitSel = document.getElementById('unit');
+      unitSel.value = 'THz';
+      document.getElementById('fCenter').value = (center/1e12).toFixed(6);
+      document.getElementById('span').value = Math.min(1e14, Math.max(span*1.2, 1e3)); // etwas Rand
+      const evt = new Event('input'); document.getElementById('span').dispatchEvent(evt);
+    }
+
+    // Startzeiten leicht streuen, damit sie im Now-Fenster laufen
+    const now = Date.now();
+    rows.forEach(r=>{
+      const len = r.endMs - r.startMs;
+      r.startMs = now + Math.random()*15000;
+      r.endMs   = r.startMs + len;
+    });
+
+    return rows;
+  }catch(e){
+    console.error('CSV Fehler',e); return [];
+  }
+}
 
 // ============================================================================
-// (6) ActiveTx Verwaltung
+// (6) ActiveTx
 // ============================================================================
 let activeTx=[];
-function updateActiveTx(){
-  const now=Date.now();
-  // Entferne abgelaufene, aber lasse Testsignale immer drin
-  activeTx = activeTx.filter(tx => tx.permanent || now < tx.endMs);
-}
+function updateActiveTx(){ const now=Date.now(); activeTx=activeTx.filter(tx=>tx.permanent || now<tx.endMs); }
 
 // ============================================================================
-// (7) Main Loop + Konversations-Engine
+// (7) Main Loop + Konversation
 // ============================================================================
-let currentConv = null;
-let nextMsgTime = Date.now()+5000;
+let currentConv=null, nextMsgTime=Date.now()+5000;
 
 function generateCivilianTraffic(){
-  // Frequenz und Mode plausibel wählen, immer im sichtbaren Bereich!
-  const modes = ["CW","PSK","FSK"];
-  const mode = pickRandom(modes);
-  const now = Date.now();
-  const dur = (12000+Math.random()*18000); // 12–30s
-  // Frequenz im sichtbaren Bereich (±35% vom Center)
-  const fc = getCenterHz();
-  const span = getSpan();
-  const freq = fc + (Math.random()-0.5)*span*0.7;
-  return {
-    name:"CIVIL",
-    f:Math.max(300,freq),
-    bw: mode==="CW" ? 500 : 2500,
-    mode,
-    type:"zivil",
-    content:"",
-    amp:0.5+Math.random()*0.3, // etwas lauter für Sichtbarkeit
-    startMs: now,
-    endMs: now+dur
-  };
+  const modes=["CW","PSK","FSK"]; const mode=pickRandom(modes);
+  const now=Date.now(), dur=(12000+Math.random()*18000);
+  const fc=getCenterHz(), span=getSpan();
+  const freq=fc+(Math.random()-0.5)*span*0.7;
+  return { name:"CIVIL", f:Math.max(300,freq), bw:mode==="CW"?500:2500, mode, type:"zivil", content:"", amp:0.5+Math.random()*0.3, startMs:now, endMs:now+dur };
 }
-
 function mainLoop(){
-  const now = Date.now();
-  updateActiveTx();
-
-  // Konversationsbasierter Datenverkehr
-  if(now > nextMsgTime){
-    if(!currentConv || currentConv.step >= currentConv.max){
-      currentConv = newConversation();
-    }
-    const msg = advanceConversation(currentConv);
+  const now=Date.now(); updateActiveTx();
+  if(now>nextMsgTime){
+    if(!currentConv || currentConv.step>=currentConv.max) currentConv=newConversation();
+    const msg=advanceConversation(currentConv);
     if(msg){
-      const tx = generateCivilianTraffic();
-      tx.content = msg.content;
-      tx.name = currentConv.type.toUpperCase();
-      playSignal(tx);
-      activeTx.push(tx);
+      const tx=generateCivilianTraffic(); tx.content=msg.content; tx.name=currentConv.type.toUpperCase();
+      playSignal(tx); activeTx.push(tx);
       document.getElementById("status").textContent="Traffic: "+msg.content;
     }
-    nextMsgTime = now + (5000 + Math.random()*10000);
+    nextMsgTime=now+(5000+Math.random()*10000);
   }
-
   requestAnimationFrame(mainLoop);
 }
 
@@ -448,72 +435,43 @@ function mainLoop(){
 // (8) Init
 // ============================================================================
 async function init(){
-  // CSV laden (falls URL gesetzt)
-  const url=document.getElementById("csvUrl").value.trim();
-  if(url){
-    const rows=await loadCsvSchedule(url);
-    rows.forEach(tx=>{ activeTx.push(tx); playSignal(tx); });
-  }
+  // Feste CSV laden
+  const rows=await loadFixedCsv();
+  rows.forEach(tx=>{ activeTx.push(tx); playSignal(tx); });
 
-  // Füge Testsignale für den Wasserfall hinzu (dauerhaft sichtbar)
-  const fc = getCenterHz();
-  const span = getSpan();
+  // Testsignale
+  const fc=getCenterHz(), span=getSpan();
   activeTx.push(
-    { name: "TEST1", f: fc-span*0.15, bw: 2000, mode: "USB", type: "zivil", amp: 0.8, startMs: 0, endMs: 0, permanent: true },
-    { name: "TEST2", f: fc,            bw: 4000, mode: "AM",  type: "zivil", amp: 0.7, startMs: 0, endMs: 0, permanent: true },
-    { name: "TEST3", f: fc+span*0.18,  bw: 1200, mode: "CW",  type: "zivil", amp: 0.9, startMs: 0, endMs: 0, permanent: true }
+    { name:"TEST1", f:fc-span*0.15, bw:2000, mode:"USB", type:"zivil", amp:0.8, startMs:0, endMs:0, permanent:true },
+    { name:"TEST2", f:fc,            bw:4000, mode:"AM",  type:"zivil", amp:0.7, startMs:0, endMs:0, permanent:true },
+    { name:"TEST3", f:fc+span*0.18,  bw:1200, mode:"CW",  type:"zivil", amp:0.9, startMs:0, endMs:0, permanent:true }
   );
 
-  // === Zufällige zivile Kommunikation mit Inhalt ===
-  // Erzeuge 8-15 breite, realistische zivile Signale mit zufälligen, plausiblen Inhalten
-  const now = Date.now();
-  const civilianModes = ["USB", "AM", "FM", "LSB"];
-  const civilianNames = ["CIVIL", "SHIP", "AIR", "COM", "SAT", "TOWER", "GROUND", "WX"];
-  const civilianContents = [
-    "REQUEST LANDING CLEARANCE",
-    "ROGER, PROCEED TO RUNWAY 27",
-    "WEATHER REPORT: VISIBILITY 10KM, WIND 270/12KT",
-    "CHECK-IN: FLIGHT 1234, POSITION 50N 8E",
-    "CARGO STATUS: ALL SECURED",
-    "CONTACT GROUND FOR TAXI INSTRUCTIONS",
-    "EMERGENCY DRILL SCHEDULED AT 14:00 UTC",
-    "MAINTENANCE REQUIRED ON ANTENNA ARRAY",
-    "SATCOM LINK ESTABLISHED, DATA TRANSFER INITIATED",
-    "CREW CHANGE COMPLETE, READY FOR DEPARTURE",
-    "FUEL LEVEL AT 78 PERCENT",
-    "SECURITY CHECK PASSED, ACCESS GRANTED",
-    "ROUTINE SYSTEMS CHECK: ALL GREEN",
-    "PASSENGER MANIFEST RECEIVED",
-    "COMMUNICATIONS NOMINAL"
+  // Zufällige zivile Kommunikation
+  const now=Date.now();
+  const civilianModes=["USB","AM","FM","LSB"];
+  const civilianNames=["CIVIL","SHIP","AIR","COM","SAT","TOWER","GROUND","WX"];
+  const civilianContents=[
+    "REQUEST LANDING CLEARANCE","ROGER, PROCEED TO RUNWAY 27","WEATHER REPORT: VISIBILITY 10KM, WIND 270/12KT",
+    "CHECK-IN: FLIGHT 1234, POSITION 50N 8E","CARGO STATUS: ALL SECURED","CONTACT GROUND FOR TAXI INSTRUCTIONS",
+    "EMERGENCY DRILL SCHEDULED AT 14:00 UTC","MAINTENANCE REQUIRED ON ANTENNA ARRAY","SATCOM LINK ESTABLISHED, DATA TRANSFER INITIATED",
+    "CREW CHANGE COMPLETE, READY FOR DEPARTURE","FUEL LEVEL AT 78 PERCENT","SECURITY CHECK PASSED, ACCESS GRANTED",
+    "ROUTINE SYSTEMS CHECK: ALL GREEN","PASSENGER MANIFEST RECEIVED","COMMUNICATIONS NOMINAL"
   ];
-  const nSignals = 8 + Math.floor(Math.random() * 8);
-  for(let i=0; i<nSignals; ++i) {
-    const f = fc - span*0.45 + Math.random()*span*0.9;
-    const bw = 2000 + Math.random()*10000;
-    const amp = 0.3 + Math.random()*0.5;
-    const mode = civilianModes[Math.floor(Math.random()*civilianModes.length)];
-    const name = civilianNames[Math.floor(Math.random()*civilianNames.length)];
-    // Inhalt zufällig wählen
-    const content = civilianContents[Math.floor(Math.random()*civilianContents.length)];
-    activeTx.push({
-      name,
-      f,
-      bw,
-      mode,
-      type: "zivil",
-      amp,
-      content,
-      startMs: now,
-      endMs: now + 60000 + Math.random()*120000, // 1-3 Minuten
-      permanent: true
-    });
+  const nSignals=8+Math.floor(Math.random()*8);
+  for(let i=0;i<nSignals;i++){
+    const f=fc-span*0.45+Math.random()*span*0.9;
+    const bw=2000+Math.random()*10000;
+    const amp=0.3+Math.random()*0.5;
+    const mode= civilianModes[Math.floor(Math.random()*civilianModes.length)];
+    const name= civilianNames[Math.floor(Math.random()*civilianNames.length)];
+    const content= civilianContents[Math.floor(Math.random()*civilianContents.length)];
+    const tx={ name,f,bw,mode,type:"zivil",amp,content,startMs:now,endMs:now+10000+Math.random()*20000, permanent:false };
+    activeTx.push(tx); playSignal(tx);
   }
 
-  // Footer Zeitstempel
-  const now2=new Date();
-  const ts=now2.toISOString().replace("T"," ").substring(0,19);
-  document.getElementById("footerText").textContent=
-    "© Anaxes Naval System – V:2.0 | "+ts;
+  const now2=new Date(); const ts=now2.toISOString().replace("T"," ").substring(0,19);
+  document.getElementById("footerText").textContent="© Anaxes Naval System – V:2.0 | "+ts;
 
   mainLoop();
 }
@@ -521,27 +479,23 @@ async function init(){
 document.addEventListener("DOMContentLoaded", function() {
   init();
 
-  // === Canvas references for rendering ===
-  window.spectrum = document.getElementById('spectrum');
-  window.waterfall = document.getElementById('waterfall');
+  // === Canvas refs
+  window.spectrum=document.getElementById('spectrum');
+  window.waterfall=document.getElementById('waterfall');
 
-  // --- Utility functions needed by rendering and interaction ---
-  function getCenterHz() {
-    const v = parseFloat(document.getElementById('fCenter').value) || 0;
-    const u = document.getElementById('unit').value;
-    const mul = {Hz:1, kHz:1e3, MHz:1e6, GHz:1e9, THz:1e12}[u]||1;
+  // === Utils
+  function getCenterHz(){
+    const v=parseFloat(document.getElementById('fCenter').value)||0;
+    const u=document.getElementById('unit').value;
+    const mul={Hz:1,kHz:1e3,MHz:1e6,GHz:1e9,THz:1e12}[u]||1;
     return v*mul;
   }
-  function getSpan() {
-    return parseFloat(document.getElementById('span').value) || 1e6;
+  function getSpan(){ return parseFloat(document.getElementById('span').value)||1e6; }
+  function setSpanLabel(){
+    const v=getSpan(); let s=v>=1e12?(v/1e12).toFixed(3)+' THz':v>=1e9?(v/1e9).toFixed(3)+' GHz':v>=1e6?(v/1e6).toFixed(3)+' MHz':v>=1e3?(v/1e3).toFixed(1)+' kHz':v+' Hz';
+    document.getElementById('spanLbl').textContent=s;
   }
-  function setSpanLabel() {
-    const v = getSpan();
-    let s = v>=1e12?(v/1e12).toFixed(3)+' THz':v>=1e9?(v/1e9).toFixed(3)+' GHz':v>=1e6?(v/1e6).toFixed(3)+' MHz':v>=1e3?(v/1e3).toFixed(1)+' kHz':v+' Hz';
-    document.getElementById('spanLbl').textContent = s;
-  }
-  function fmtHz(f){
-    const a=Math.abs(f);
+  function fmtHz(f){ const a=Math.abs(f);
     if(a>=1e12)return(f/1e12).toFixed(3)+' THz';
     if(a>=1e9)return(f/1e9).toFixed(3)+' GHz';
     if(a>=1e6)return(f/1e6).toFixed(3)+' MHz';
@@ -549,12 +503,9 @@ document.addEventListener("DOMContentLoaded", function() {
     return f.toFixed(0)+' Hz';
   }
   function clamp(v,a,b){return Math.max(a,Math.min(v,b));}
-  function xToHz(x){
-    const fc=getCenterHz(),sp=getSpan();
-    return fc+(x-.5)*sp;
-  }
+  function xToHz(x){ const fc=getCenterHz(),sp=getSpan(); return fc+(x-.5)*sp; }
 
-  // --- Astronomical/Spur signals for visual interest ---
+  // === Astronomical + Spurs
   function generateSignals(){
     const s={astroLines:[],spurs:[]};
     const base=[['H I',1.420405751e9],['OH 1612',1.612231e9],['OH 1665',1.6654018e9],
@@ -563,131 +514,162 @@ document.addEventListener("DOMContentLoaded", function() {
       const v=(Math.random()-0.5)*400, f=f0+v*1e3, bw=Math.max(500,f*0.0001);
       s.astroLines.push({name,f,bw,amp:0.5+Math.random()*0.3});
     });
-    for(let i=0;i<8;i++)s.spurs.push({f:Math.random()*1e13,bw:Math.random()*8000+200,amp:0.15+Math.random()*0.2});
+    for(let i=0;i<8;i++) s.spurs.push({f:Math.random()*1e13,bw:Math.random()*8000+200,amp:0.15+Math.random()*0.2});
     return s;
   }
-  let signals = generateSignals();
+  let signals=generateSignals();
 
-  // --- Canvas Management ---
+  // === Canvas sizing
   function resizeCanvas(canvas,container){
     const r=container.getBoundingClientRect();
     const w=Math.max(32,Math.floor(r.width));
     const h=Math.max(32,Math.floor(r.height));
-    if(canvas.width!==w||canvas.height!==h){
-      canvas.width=w;canvas.height=h;
-      canvas.style.width=r.width+'px';canvas.style.height=r.height+'px';
-      return true;
-    }
+    if(canvas.width!==w||canvas.height!==h){ canvas.width=w; canvas.height=h; canvas.style.width=r.width+'px'; canvas.style.height=r.height+'px'; return true; }
     return false;
   }
-  function layout(){
-    resizeCanvas(spectrum,document.querySelector('.spectrum-container'));
-    resizeCanvas(waterfall,document.querySelector('.waterfall-container'));
-  }
-  window.addEventListener('resize',layout);
-  layout();
+  function layout(){ resizeCanvas(spectrum,document.querySelector('.spectrum-container')); resizeCanvas(waterfall,document.querySelector('.waterfall-container')); }
+  window.addEventListener('resize',layout); layout();
 
-  // --- Rendering ---
-  const TYPE_COLOR={zivil:'#ffd666',feindlich:'#ff5a5a',verbündet:'#63e28e','störung':'#c0a060',astronomisch:'#66ccff'};
-  function getSignalPower(hz,t,pxHz){
-    let power=0.03+(Math.random()-.5)*.015;
-    signals.astroLines.forEach(s=>{
-      const half=Math.max(s.bw*.5,pxHz*.5),d=Math.abs(hz-s.f);
-      if(d<half)power+=s.amp*(1-d/half);
-    });
-    signals.spurs.forEach(s=>{
-      const half=Math.max(s.bw*.5,pxHz),d=Math.abs(hz-s.f);
-      if(d<half)power+=s.amp*(1-d/half);
-    });
-    // --- Zivile Kommunikation sichtbar machen ---
-    activeTx.forEach(tx=>{
-      // Nur zivil, mit Inhalt, und Bandbreite > 2000 Hz (damit keine dünnen Linien)
-      if(tx.type==="zivil" && tx.content && tx.bw > 2000){
-        const fc=tx.f,half=Math.max((tx.bw||2400)*.5,pxHz*2);
-        const d=Math.abs(hz-fc);
-        if(d<half) {
-          // Mehr Power für breite Signale
-          power += (tx.amp||0.5)*(1-d/half)*1.7;
+  // === Realistische Spektrum-Logik (dB)
+  function txToSpectral(tx){
+    const power = -95 + (tx.amp??0.3)*50; // -95…-45 dB
+    return { f:tx.f, bw:tx.bw||2400, power, mode:tx.mode };
+  }
+  function astroToSpectral(s){ return { f:s.f, bw:s.bw||1000, power:-85 + (s.amp??0.2)*25, mode:"ASTRO" }; }
+  function spurToSpectral(s){ return { f:s.f, bw:s.bw||800,  power:-90 + (s.amp??0.1)*30, mode:"SPUR"  }; }
+
+  function collectSpectral(span){
+    const list=[];
+    activeTx.forEach(tx=>list.push(txToSpectral(tx)));
+    signals.astroLines.forEach(a=>list.push(astroToSpectral(a)));
+    signals.spurs.forEach(p=>list.push(spurToSpectral(p)));
+    const fc=getCenterHz(), fmin=fc-span/2, fmax=fc+span/2;
+    return list.filter(s=> s.f+s.bw/2>=fmin && s.f-s.bw/2<=fmax);
+  }
+
+  function generateSpectrum(span, comps, bins=1024){
+    const spec=new Array(bins).fill(-120);
+    for(let i=0;i<bins;i++) spec[i]+=Math.random()*6-3;
+    const fc=getCenterHz();
+    comps.forEach(sig=>{
+      const relCenter = (sig.f-(fc-span/2))/span;
+      const center=Math.floor(relCenter*bins);
+      const bwBins = Math.max(1, Math.floor(sig.bw/(span/bins)));
+      for(let j=-bwBins;j<=bwBins;j++){
+        const b=center+j; if(b<0||b>=bins) continue;
+        const dist=Math.abs(j)/bwBins;
+        const p=sig.power*Math.exp(-dist*3);
+        spec[b]=Math.max(spec[b],p);
+        if(sig.mode==="AM"||sig.mode==="USB"||sig.mode==="LSB"){
+          const sbP=sig.power-20;
+          spec[b]=Math.max(spec[b], sbP*Math.exp(-dist*2));
         }
       }
-      // Andere (Test, ohne Inhalt) wie gehabt
-      else if(tx.type==="zivil"){
-        const fc=tx.f,half=Math.max((tx.bw||2400)*.5,pxHz);
-        const d=Math.abs(hz-fc);
-        if(d<half)power+=(tx.amp||0.3)*(1-d/half);
-      }
     });
-    return Math.max(0,power);
+    return spec;
   }
+
+  function dbToY(db,H){ return H-( (db+120)/80 * H ); }
+  function dbToColor(db){
+  // db typischer Bereich -120 … -40 dB
+  const norm = Math.max(0, Math.min(1, (db+120)/80));
+  let r,g,b;
+
+  if(norm < 0.25){
+    // Dunkelblau bis Violett
+    r = 0;
+    g = 0;
+    b = Math.floor(150 + norm*400); // 150–250
+  } else if(norm < 0.5){
+    // Blau → Magenta
+    r = Math.floor((norm-0.25)*4*255);
+    g = 0;
+    b = 255;
+  } else if(norm < 0.75){
+    // Magenta → Gelb
+    r = 255;
+    g = Math.floor((norm-0.5)*4*255);
+    b = 255 - g;
+  } else {
+    // Gelb → Weiß
+    r = 255;
+    g = 255;
+    b = Math.floor(255*(1-(norm-0.75)*4));
+  }
+  return [r,g,b];
+}
+
+
+
+
+  // === Rendering
   function drawSpectrum(){
-    const ctx = spectrum.getContext('2d');
-    const W = spectrum.width, H = spectrum.height;
-    if(W<1||H<1)return;
-    ctx.fillStyle='#0f1218';
-    ctx.fillRect(0,0,W,H);
-    const t=performance.now()/1000,pxHz=getSpan()/W;
-    let vmax=.1, data=new Float32Array(W);
-    for(let x=0;x<W;x++){
-      const hz=xToHz(x/W),v=getSignalPower(hz,t,pxHz);
-      data[x]=v; if(v>vmax)vmax=v;
+    const ctx=spectrum.getContext('2d');
+    const W=spectrum.width, H=spectrum.height; if(W<1||H<1) return;
+    ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+    const span=getSpan();
+    const comps=collectSpectral(span);
+    const data=generateSpectrum(span, comps, 1024);
+
+    ctx.beginPath(); ctx.strokeStyle='#0f0'; ctx.lineWidth=1.5;
+    for(let i=0;i<data.length;i++){
+      const x=i/data.length*W; const y=dbToY(data[i],H);
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y);
     }
-    if(vmax>0){
-      ctx.strokeStyle='#87a3ff';
-      ctx.beginPath();
-      const g=1/vmax;
-      for(let x=0;x<W;x++){
-        const y=H-(clamp(data[x]*g,0,1)*H);
-        if(x===0)ctx.moveTo(x,y); else ctx.lineTo(x,y);
-      }
-      ctx.stroke();
-    }
-    ctx.fillStyle='#b8c1e1';
-    ctx.font='10px monospace';
+    ctx.stroke();
+
+    ctx.fillStyle='#0f0'; ctx.font='10px monospace';
     for(let i=0;i<=4;i++){
-      const hz=xToHz(i/4);
-      ctx.fillText(fmtHz(hz),i*W/4+2,12);
+      const hz=getCenterHz()+(i/4-0.5)*span;
+      ctx.fillText(fmtHz(hz), i*W/4+2, H-4);
     }
-    drawOverlays(ctx,W,H,pxHz);
+    drawOverlays(ctx,W,H, span/W);
   }
-  function drawWaterfall(){
+
+    function drawWaterfall(){
     const ctx = waterfall.getContext('2d');
     const W = waterfall.width, H = waterfall.height;
-    if(W<1||H<1)return;
-    // SDR-typische Farben: Schwarz als Basis, Signal von dunkelblau → violett → gelb/weiß
+    if(W < 1 || H < 1) return;
+
+    // aktuelle Anzeigeparameter
+    const span = getSpan();
+    const fc   = getCenterHz();
+    const fmin = fc - span/2;
+
+    // bestehendes Bild eine Zeile nach oben schieben
     ctx.drawImage(waterfall, 0, 1, W, H-1, 0, 0, W, H-1);
-    const img = ctx.createImageData(W,1);
-    const t=performance.now()/1000,pxHz=getSpan()/W;
-    let vmax=.1, data=new Float32Array(W);
+
+    const y = H - 1; // unterste Zeile
     for(let x=0;x<W;x++){
-      const hz=xToHz(x/W),v=getSignalPower(hz,t,pxHz);
-      data[x]=v; if(v>vmax)vmax=v;
-    }
-    for(let x=0;x<W;x++){
-      const q=clamp(data[x]/vmax,0,1);
-      // Farbverlauf: 0=blau, 0.5=violett, 1=gelb/weiß
-      let r=0,g=0,b=0;
-      if(q<0.5){
-        // Blau bis Violett
-        r = Math.floor(128*q*2);
-        g = 0;
-        b = Math.floor(255*(0.5+q));
-      } else {
-        // Violett bis Gelb/Weiß
-        r = Math.floor(255*(q-0.5)*2 + 128);
-        g = Math.floor(255*(q-0.5)*2);
-        b = Math.floor(255*(1-q));
+      const fx = fmin + (x/W)*span;  // Frequenz an Pixel X
+
+      // Grundrauschen
+      let db = -112 + Math.random()*6;  
+
+      // aktive Signale einzeichnen
+      for(const tx of activeTx){
+        const bw = tx.bw || 2400;
+        const df = Math.abs(fx - tx.f);
+        if(df <= bw/2){
+          const rel = df/(bw/2);
+          // Peak bei Mitte, Abfall zu den Rändern
+          const p = -70 + 25*Math.exp(-3*rel*rel);
+          if(p > db) db = p + (Math.random()*2 - 1); // leichtes Flackern
+        }
       }
-      img.data[x*4+0] = r;
-      img.data[x*4+1] = g;
-      img.data[x*4+2] = b;
-      img.data[x*4+3] = 255;
+
+      // Farbe berechnen
+      const col = dbToColor(db);
+      ctx.fillStyle = `rgb(${col[0]},${col[1]},${col[2]})`;
+      ctx.fillRect(x, y, 1, 1);
+
     }
-    ctx.putImageData(img, 0, H-1);
   }
+
   function drawOverlays(ctx,W,H,pxHz){
+    const TYPE_COLOR={zivil:'#ffd666',feindlich:'#ff5a5a',verbündet:'#63e28e','störung':'#c0a060',astronomisch:'#66ccff'};
     const fc=getCenterHz(),sp=getSpan(),fmin=fc-sp/2;
     ctx.save();
-    // Astronomische Linien
     ctx.fillStyle='#ffc94d';
     signals.astroLines.forEach(s=>{
       if(s.f>=fmin&&s.f<=fmin+sp){
@@ -695,50 +677,32 @@ document.addEventListener("DOMContentLoaded", function() {
         ctx.fillRect(x,0,Math.max(1,pxHz/sp*W*2),4);
       }
     });
-    // Aktive Transmitter
     activeTx.forEach(tx=>{
       const col=TYPE_COLOR[tx.type]||'#8aa';
-      let xL=((tx.f-(tx.bw||2400)/2-fmin)/sp)*W;
-      let xR=((tx.f+(tx.bw||2400)/2-fmin)/sp)*W;
-      const w=Math.max(2,xR-xL);
-      ctx.fillStyle=col+'24';
-      ctx.fillRect(Math.max(0,xL),0,w,H);
-      ctx.strokeStyle=col+'8c';
-      ctx.beginPath();
-      ctx.moveTo(xL,0);ctx.lineTo(xL,H);
-      ctx.moveTo(xR,0);ctx.lineTo(xR,H);
-      ctx.stroke();
-      ctx.fillStyle='rgba(255,255,255,.85)';
-      ctx.font='700 10px monospace';
-      ctx.fillText(`${tx.name||'TX'} [${tx.mode}]`,Math.max(2,xL+2),12);
+      const xL=((tx.f-(tx.bw||2400)/2-fmin)/sp)*W;
+      const xR=((tx.f+(tx.bw||2400)/2-fmin)/sp)*W;
+      ctx.strokeStyle=col+'aa';
+      ctx.beginPath(); ctx.moveTo(xL,0); ctx.lineTo(xL,H); ctx.moveTo(xR,0); ctx.lineTo(xR,H); ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.9)'; ctx.font='700 10px monospace';
+      ctx.fillText(`${tx.name||'TX'} [${tx.mode}]`, Math.max(2, xL+2), 12);
     });
     ctx.restore();
   }
 
-  // --- Animation Loop ---
-  function renderLoop(){
-    drawSpectrum();
-    drawWaterfall();
-    requestAnimationFrame(renderLoop);
-  }
+  function renderLoop(){ drawSpectrum(); drawWaterfall(); requestAnimationFrame(renderLoop); }
   requestAnimationFrame(renderLoop);
 
-  // --- Interaction: Pan, Zoom, Listen ---
+  // === Interaction
   let isDown=false,startX=0,startFc=0,moved=0;
-  spectrum.addEventListener('mousedown',function(e){
-    isDown=true; startX=e.clientX; startFc=getCenterHz(); moved=0;
-  });
-  spectrum.addEventListener('mousemove',function(e){
+  spectrum.addEventListener('mousedown',e=>{ isDown=true; startX=e.clientX; startFc=getCenterHz(); moved=0; });
+  spectrum.addEventListener('mousemove',e=>{
     if(!isDown)return;
-    const r=spectrum.getBoundingClientRect();
-    const dx=e.clientX-startX;
-    moved=Math.max(moved,Math.abs(dx));
-    const shift=-dx/r.width*getSpan();
-    document.getElementById('fCenter').value=(startFc+shift)/1e6;
-    setSpanLabel();
+    const r=spectrum.getBoundingClientRect(); const dx=e.clientX-startX;
+    moved=Math.max(moved,Math.abs(dx)); const shift=-dx/r.width*getSpan();
+    document.getElementById('fCenter').value=(startFc+shift)/1e6; setSpanLabel();
   });
-  spectrum.addEventListener('mouseup',function(e){isDown=false;});
-  spectrum.addEventListener('mouseleave',function(e){isDown=false;});
+  spectrum.addEventListener('mouseup',()=>{isDown=false;});
+  spectrum.addEventListener('mouseleave',()=>{isDown=false;});
   spectrum.addEventListener('wheel',function(e){
     e.preventDefault();
     const r=spectrum.getBoundingClientRect();
@@ -747,8 +711,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const anchorHz=fc+(x-0.5)*span;
     const factor=Math.pow(1.3,-Math.sign(e.deltaY));
     const nsp=clamp(span/factor,1e3,1e13);
-    document.getElementById('span').value=nsp;
-    setSpanLabel();
+    document.getElementById('span').value=nsp; setSpanLabel();
     document.getElementById('fCenter').value=(anchorHz-(x-0.5)*nsp)/1e6;
   });
   spectrum.addEventListener('dblclick',function(e){
@@ -756,8 +719,7 @@ document.addEventListener("DOMContentLoaded", function() {
     const x=clamp((e.clientX-r.left)/r.width,0,1);
     const fc=getCenterHz(),span=getSpan();
     const hz=fc+(x-0.5)*span;
-    document.getElementById('fCenter').value=hz/1e6;
-    setSpanLabel();
+    document.getElementById('fCenter').value=hz/1e6; setSpanLabel();
   });
   spectrum.addEventListener('click',function(e){
     const r=spectrum.getBoundingClientRect();
@@ -767,9 +729,8 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById('status').textContent='Tuned to '+fmtHz(hz);
   });
 
-   // --- Update span label on input ---
   document.getElementById('span').addEventListener('input', setSpanLabel);
-   setSpanLabel();
+  setSpanLabel();
 });
 })();
 </script>
